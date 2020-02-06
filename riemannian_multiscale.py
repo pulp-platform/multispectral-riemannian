@@ -13,8 +13,8 @@ __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 
-class riemannian_multiscale:
-    """ Riemannian feature multiscale class 
+class RiemannianMultiscale:
+    """ Riemannian feature multiscale class
 
     Parameters
     ----------
@@ -97,17 +97,14 @@ class riemannian_multiscale:
         for trial_idx in range(n_tr_trial):
 
             for temp_idx in range(self.n_temp):
-                t_start, t_end = self.temp_windows[temp_idx,
-                                                   0], self.temp_windows[temp_idx, 1]
-                n_samples = t_end-t_start
+                t_start, t_end = self.temp_windows[temp_idx, 0], self.temp_windows[temp_idx, 1]
 
                 for freq_idx in range(self.n_freq):
                     # filter signal
-                    data_filter = butter_fir_filter(
-                        data[trial_idx, :, t_start:t_end], self.filter_bank[freq_idx])
+                    data_filter = self._filter_signal(data[trial_idx, :, t_start:t_end], freq_idx)
+
                     # regularized covariance matrix
-                    cov_mat[trial_idx, temp_idx, freq_idx] = 1/(n_samples-1)*np.dot(
-                        data_filter, np.transpose(data_filter)) + self.rho/n_samples*np.eye(n_channel)
+                    cov_mat[trial_idx, temp_idx, freq_idx] = self._reg_cov_mat(data_filter)
 
         # calculate mean covariance matrix
         self.c_ref_invsqrtm = np.zeros((self.n_freq, n_channel, n_channel))
@@ -118,8 +115,8 @@ class riemannian_multiscale:
                 self.c_ref_invsqrtm[freq_idx] = np.eye(n_channel)
             else:
                 # Mean covariance matrix over all trials and temp winds per frequency band
-                cov_avg = mean.mean_covariance(
-                    cov_mat[:, :, freq_idx].reshape(-1, n_channel, n_channel), metric=self.mean_metric)
+                cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, n_channel, n_channel),
+                                               metric=self.mean_metric)
                 self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
 
         # calculate training features
@@ -161,19 +158,16 @@ class riemannian_multiscale:
             for temp_idx in range(self.n_temp):
                 t_start, t_end = self.temp_windows[temp_idx,
                                                    0], self.temp_windows[temp_idx, 1]
-                n_samples = t_end-t_start
 
                 for freq_idx in range(self.n_freq):
                     # filter signal
-                    data_filter = butter_fir_filter(
-                        data[trial_idx, :, t_start:t_end], self.filter_bank[freq_idx])
+                    data_filter = self._filter_signal(data[trial_idx, :, t_start:t_end], freq_idx)
 
                     # regularized covariance matrix
-                    cov_mat = 1/(n_samples-1)*np.dot(data_filter, np.transpose(
-                        data_filter)) + self.rho/n_samples*np.eye(self.n_channel)
-                    #
-                    feat[trial_idx, temp_idx, freq_idx] = self.riem_kernel(
-                        cov_mat, self.c_ref_invsqrtm[freq_idx])
+                    cov_mat = self._reg_cov_mat(data_filter)
+
+                    # compute the riemannian kernel
+                    feat[trial_idx, temp_idx, freq_idx] = self.riem_kernel(cov_mat, self.c_ref_invsqrtm[freq_idx])
 
         if self.vectorized:
             return feat.reshape(n_trial, -1)
@@ -199,14 +193,12 @@ class riemannian_multiscale:
 
         for freq_idx in range(self.n_freq):
             # filter signal
-            data_filter = butter_fir_filter(data, self.filter_bank[freq_idx])
+            data_filter = self._filter_signal(data, freq_idx)
 
             # regularized covariance matrix
-            cov_mat = 1/(n_samples-1)*np.dot(data_filter, np.transpose(data_filter)
-                                             ) + self.rho/n_samples*np.eye(self.n_channel)
-            #
-            feat[freq_idx] = self.riem_kernel(
-                cov_mat, self.c_ref_invsqrtm[freq_idx])
+            cov_mat = self._reg_cov_mat(data_filter)
+
+            feat[freq_idx] = self.riem_kernel(cov_mat, self.c_ref_invsqrtm[freq_idx])
 
         if self.vectorized:
             return feat.reshape(-1)
@@ -243,8 +235,24 @@ class riemannian_multiscale:
                 idx += 1
         return out_vec
 
+    def _filter_signal(self, data, freq_idx):
+        """ Apply the selected filter to the data """
+        return butter_fir_filter(data, self.filter_bank[freq_idx])
+
+    def _reg_cov_mat(self, data):
+        """ Compute the regularized covariance matrix """
+        n_samples = data.shape[1]
+        n_channel = data.shape[0]
+        return 1/(n_samples-1) * np.dot(data, np.transpose(data)) + self.rho/n_samples*np.eye(n_channel)
+
     def whitened_kernel(self, mat, c_ref_invsqrtm):
         return self.half_vectorization(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm))
 
     def log_whitened_kernel(self, mat, c_ref_invsqrtm):
         return self.half_vectorization(base.logm(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)))
+
+
+class QuantizedRiemannMultiscale(RiemannianMultiscale):
+    """ 8-bit Quantized Model of the RiemannianMultiscale """
+
+    pass

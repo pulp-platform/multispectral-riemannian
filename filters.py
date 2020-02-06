@@ -97,8 +97,8 @@ def load_filterbank(bandwidth, fs, order=4, max_freq=40, ftype='butter'):
 
     for band_idx in range(n_bands):
         if ftype == 'butter':
-            filter_bank[band_idx] = butter(
-                order, f_band_nom[band_idx], analog=False, btype='band', output='sos')
+            filter_bank[band_idx] = butter(order, f_band_nom[band_idx], analog=False,
+                                           btype='band', output='sos')
         elif ftype == 'fir':
 
             filter_bank[band_idx] = signal.firwin(
@@ -107,7 +107,6 @@ def load_filterbank(bandwidth, fs, order=4, max_freq=40, ftype='butter'):
 
 
 def butter_fir_filter(signal_in, filter_coeff):
-
     if filter_coeff.ndim == 2:  # butter worth
         return sosfilt(filter_coeff, signal_in)
     elif filter_coeff.ndim == 1:  # fir filter

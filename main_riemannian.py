@@ -12,19 +12,20 @@ from sklearn.svm import LinearSVC, SVC
 from sklearn.model_selection import KFold
 
 # import self defined functions
-from riemannian_multiscale import riemannian_multiscale
+from riemannian_multiscale import RiemannianMultiscale
 from filters import load_filterbank
 from get_data import get_data
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
+DATA_PATH = "dataset/"
 
-class Riemannian_Model:
+class RiemannianModel:
 
     def __init__(self):
         self.crossvalidation = False
-        self.data_path = 'dataset/'
+        self.data_path = DATA_PATH
         self.svm_kernel = 'linear'  # 'sigmoid'#'linear' # 'sigmoid', 'rbf',
         self.svm_c = 0.1  # for linear 0.1 (inverse),
         self.no_splits = 5  # number of folds in cross validation
@@ -33,11 +34,12 @@ class Riemannian_Model:
         self.no_subjects = 9
         # Total number of CSP feature per band and timewindow
         self.no_riem = int(self.no_channels*(self.no_channels+1)/2)
-        self.bw = np.array([2, 4, 8, 16, 32])  # bandwidth of filtered signals
+        #self.bw = np.array([2, 4, 8, 16, 32])  # bandwidth of filtered signals
+        self.bw = np.array([2]) # use only the 2Hz bandwidths
         self.ftype = 'butter'  # 'fir', 'butter'
         self.forder = 2  # 4
-        self.filter_bank = load_filterbank(
-            self.bw, self.fs, order=self.forder, max_freq=40, ftype=self.ftype)  # get filterbank coeffs
+        self.filter_bank = load_filterbank(self.bw, self.fs, order=self.forder, max_freq=40,
+                                           ftype=self.ftype)  # get filterbank coeffs
         time_windows_flt = np.array([[2.5, 4.5],
                                      [4, 6],
                                      [2.5, 6],
@@ -67,14 +69,18 @@ class Riemannian_Model:
         self.subject = None
         self.split = None
 
+        print(f"Using {self.no_bands} filterbands of shape: {self.filter_bank.shape[1:]}")
+        print(f"Using {self.no_time_windows} time windows of size: " +
+              ",".join(str(w[1] - w[0]) for w in self.time_windows))
+
     def run_riemannian(self):
 
         ################################ Training ############################################################################
         start_train = time.time()
 
         # 1. calculate features and mean covariance for training
-        riemann = riemannian_multiscale(
-            self.filter_bank, self.time_windows, riem_opt=self.riem_opt, rho=self.rho, vectorized=True)
+        riemann = RiemannianMultiscale(self.filter_bank, self.time_windows, riem_opt=self.riem_opt,
+                                       rho=self.rho, vectorized=True)
         train_feat = riemann.fit(self.train_data)
 
         # 2. Train SVM Model
@@ -127,7 +133,7 @@ class Riemannian_Model:
 
 
 def main():
-    model = Riemannian_Model()
+    model = RiemannianModel()
 
     print("Number of used features: " + str(model.no_features))
 
