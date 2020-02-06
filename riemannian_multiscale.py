@@ -20,19 +20,20 @@ class riemannian_multiscale:
     ----------
 
     filter_bank : array, shape (n_freq,order,(order))
-            Filterbank coefficients: If FIR dim = 2
-                                                            If IIR dim = 3
+                  Filterbank coefficients: If FIR dim = 2
+                                           If IIR dim = 3
+
     temp_windows : array, shape (n_temp,2)
-            start and end sample of temporal window 
+                   start and end sample of temporal window
 
-    riem_opt : String {'Riemann', "Riemann_Euclid","Whitened_Euclid","No_Adaptation"}
-            Riemannian option 
+    riem_opt: String {'Riemann', "Riemann_Euclid","Whitened_Euclid","No_Adaptation"}
+              Riemannian option
 
-    rho: float 
-            Regularization parameter for covariance calculation 
+    rho: float
+         Regularization parameter for covariance calculation
 
-    vectorized: bool 
-            Concatenate all frequency bands and temp window features to one vector
+    vectorized: bool
+                Concatenate all frequency bands and temp window features to one vector
 
     Attributes
     ----------
