@@ -12,7 +12,7 @@ from sklearn.svm import LinearSVC, SVC
 from sklearn.model_selection import KFold
 
 # import self defined functions
-from riemannian_multiscale import RiemannianMultiscale
+from riemannian_multiscale import RiemannianMultiscale, QuantizedRiemannianMultiscale
 from filters import load_filterbank
 from get_data import get_data
 
@@ -20,6 +20,8 @@ __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
+QUANTIZED = True
+ONLY_2HZ_BANDS = True
 
 class RiemannianModel:
 
@@ -34,8 +36,10 @@ class RiemannianModel:
         self.no_subjects = 9
         # Total number of CSP feature per band and timewindow
         self.no_riem = int(self.no_channels*(self.no_channels+1)/2)
-        #self.bw = np.array([2, 4, 8, 16, 32])  # bandwidth of filtered signals
-        self.bw = np.array([2]) # use only the 2Hz bandwidths
+        if ONLY_2HZ_BANDS:
+            self.bw = np.array([2])
+        else:
+            self.bw = np.array([2, 4, 8, 16, 32])
         self.ftype = 'butter'  # 'fir', 'butter'
         self.forder = 2  # 4
         self.filter_bank = load_filterbank(self.bw, self.fs, order=self.forder, max_freq=40,
@@ -79,8 +83,15 @@ class RiemannianModel:
         start_train = time.time()
 
         # 1. calculate features and mean covariance for training
-        riemann = RiemannianMultiscale(self.filter_bank, self.time_windows, riem_opt=self.riem_opt,
-                                       rho=self.rho, vectorized=True)
+        if QUANTIZED:
+            riemann = QuantizedRiemannianMultiscale(self.filter_bank, self.time_windows,
+                                                    riem_opt=self.riem_opt, rho=self.rho,
+                                                    vectorized=True)
+            riemann.prepare_quantization(self.train_data)
+        else:
+            riemann = RiemannianMultiscale(self.filter_bank, self.time_windows,
+                                           riem_opt=self.riem_opt, rho=self.rho, vectorized=True)
+
         train_feat = riemann.fit(self.train_data)
 
         # 2. Train SVM Model
