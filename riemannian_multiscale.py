@@ -8,6 +8,7 @@ import scipy
 
 from filters import butter_fir_filter
 from eig import gevd
+from utils import quantize
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
@@ -44,6 +45,7 @@ class RiemannianMultiscale:
     """
 
     def __init__(self, filter_bank, temp_windows, riem_opt='Riemann', rho=0.1, vectorized=True):
+        assert riem_opt in ["Riemann", "Riemann_Euclid", "Whitened_Euclid", "No_Adaptation"]
         # Frequency bands
         self.filter_bank = filter_bank
         self.n_freq = filter_bank.shape[0]
@@ -206,7 +208,7 @@ class RiemannianMultiscale:
         return feat
 
     def half_vectorization(self, mat):
-        '''	Calculates half vectorization of a matrix
+        ''' Calculates half vectorization of a matrix
 
         Parameters
         ----------
@@ -278,22 +280,17 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
     num_bits: int
               Number of bits for quantization
 
-    symmetric_clip: bool
-                    If true, clip values symetrically (will result in 2^num_bits - 1 levels)
-
     bitshift_scale: bool
                     If true, will make sure that bitshift can be used to transform from one layer to another
 
     """
     def __init__(self, filter_bank, temp_windows, riem_opt="Riemann", rho=0.1, vectorized=True,
-                 num_bits=8, symmetric_clip=False, bitshift_scale=False):
+                 num_bits=8, bitshift_scale=True):
+
         super(QuantizedRiemannianMultiscale, self).__init__(filter_bank, temp_windows, riem_opt=riem_opt,
                                                          rho=rho, vectorized=vectorized)
         self.num_bits = num_bits
-        self.symmetric_clip = symmetric_clip
         self.bitshift_scale = bitshift_scale
-        if bitshift_scale:
-            raise NotImplementedError("bitshift scale is not yet implemented")
 
         self.scale_input = 0
         self.scale_filter_out = np.zeros((self.n_freq, ))
@@ -353,6 +350,18 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         features = super(QuantizedRiemannianMultiscale, self).fit(data)
         features = self._output_quant(features)
 
+        if self.bitshift_scale:
+            # make sure that the transformation after the fitler is a power of two
+            for band in range(self.filter_bank.shape[0]):
+                # Formula for rescale factor: (Rx * Rw * Sy) / (Sx * Sw * Ry)
+                # The ranges are already powers of two. (i.e. 8)
+                # Sw is also a power of two
+                # Thus, Sy / Sx must be a power of two. Since Sx is fixed, we need to change Sy.
+                # Sy = Sx * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx))
+                k = np.ceil(np.log2(self.scale_filter_out[band] / self.scale_input))
+                self.scale_filter_out[band] = self.scale_input * 2 ** k
+
+
         # set the flag to monitor the range to false, the modul can now be used
         self.monitor_ranges = False
 
@@ -360,27 +369,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         """ Quantize the data to the given number of levels """
         if num_bits is None:
             num_bits = self.num_bits
-
-        if do_round:
-            max_val = 2 << (num_bits - 1)
-            clip_val = max_val - 1
-        else:
-            max_val = ((2 << num_bits) - 1) / 2
-            clip_val = max_val
-
-        data = data / factor
-        data = data * max_val
-        if self.symmetric_clip:
-            data = np.clip(data, -clip_val, clip_val)
-        else:
-            data = np.clip(data, -clip_val - 1, clip_val)
-        if do_round:
-            data = data.round()
-        else:
-            data = (data.astype(int)).astype(float)
-        data = data / max_val
-        data = data * factor
-        return data
+        return quantize(data, factor, num_bits=num_bits, do_round=do_round)
 
     def _filter_signal(self, data, freq_idx):
         """ Apply the selected filter to the data """
@@ -410,12 +399,6 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
         mul_result = np.dot(data, np.transpose(data))
 
-        # quantize the cov mat or measure the scale
-        if self.monitor_ranges:
-            self.scale_cov_mat[freq_idx] = max(self.scale_cov_mat[freq_idx], np.abs(mul_result).max())
-        else:
-            cov_mat = self._quantize(mul_result, self.scale_cov_mat[freq_idx])
-
         cov_mat = 1/(n_samples-1) * mul_result + self.rho/n_samples*np.eye(n_channel)
 
         return cov_mat
@@ -431,5 +414,8 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
     #def whitened_kernel(self, mat, c_ref_invsqrtm):
     #    return self.half_vectorization(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm))
 
-    #def log_whitened_kernel(self, mat, c_ref_invsqrtm):
-    #    return self.half_vectorization(base.logm(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)))
+    def log_whitened_kernel(self, mat, c_ref_invsqrtm):
+        #return self.half_vectorization(base.logm(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)))
+        tmp = np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)
+        mat_log = base.logm(tmp)
+        return self.half_vectorization(mat_log)
