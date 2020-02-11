@@ -6,7 +6,9 @@ __email__ = "sctibor@student.ethz.ch"
 import numpy as np
 import unittest
 
-SVD_EPSILON = 1e-15 # 2e-4
+# with 1e-5, we get 1e-2 accuracy, requiring approx 400 iterations
+SVD_EPSILON = 1e-5 # 1e-15 # 2e-4
+_ACCURACY = 1e-2 # with epsilon:1e-5
 
 def quantize(data, factor, num_bits, do_round=False):
     """ Quantize the data to the given number of levels """
@@ -41,7 +43,7 @@ def logm(mat, epsilon=SVD_EPSILON):
     log_D = np.diag(np.log(np.diag(D)))
     return L @ log_D @ R
 
-def svd(mat, epsilon=SVD_EPSILON):
+def svd(mat, epsilon=SVD_EPSILON, with_n_iter=False):
     """ Computes the singular value decomposition.
 
     A = L D R, where A is the input, D is a diagonal matrix, L and R are orthogonal matrices
@@ -61,14 +63,16 @@ def svd(mat, epsilon=SVD_EPSILON):
     """
     # return _jacobi_eigv(mat)
     Lt, T, Rt = _householder_tridiagonal(mat)
-    eigvals, Q = _qr_symm_tridiag(T, epsilon=epsilon)
+    eigvals, Q, n_iter = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=True)
     D = np.diag(eigvals)
     L = Lt @ Q
     R = Q.T @ Rt
+    if with_n_iter:
+        return L, D, R, n_iter
     return L, D, R
 
 
-def _qr_symm_tridiag(T, epsilon=SVD_EPSILON):
+def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
     """ Computes the Eigenvalues and Eigenvectors of a real, symmetric, tridiagonal matrix.
 
     The eigenvalues are computed via implicit wilkinson shift
@@ -93,6 +97,10 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON):
     off_diag = np.diag(T, k=1).copy() # range 0..N-1, in reference, it is 1..N (also, they use 1-indexing)
     Q = np.eye(N)
     m = N-1
+
+    if with_n_iter:
+        n_iter = 0
+
     while m > 0:
         # do wilkinson shift
         d = (main_diag[m-1] - main_diag[m]) / 2
@@ -133,10 +141,15 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON):
             # update the eigenvectors
             Q[:, k:k + 2] = Q[:, k:k + 2] @ np.array([[c, s], [-s, c]])
 
+            if with_n_iter:
+                n_iter += 1
+
         # check for convergence
         if np.abs(off_diag[m - 1]) < epsilon * (np.abs(main_diag[m - 1]) + np.abs(main_diag[m])):
             m = m - 1
 
+    if with_n_iter:
+        return main_diag, Q, n_iter
     return main_diag, Q
 
 
@@ -245,24 +258,29 @@ def _givens_diag(a1, a2, b):
     return np.cos(angle), -np.sin(angle)
 
 
+def _compare_mat(A, B, epsilon=1e-7):
+    """ Compares A and B, and returns True if they are very similar """
+    return np.all((A - B) < epsilon)
+
+
+def _is_diag(A, epsilon=1e-7):
+    """ returns True if the matrix is diagonal """
+    return np.all((A - np.diag(np.diag(A))) < epsilon)
+
+
+def _is_tridiagonal(A, epsilon=1e-7):
+    """ returns true if the matrix is tridiagonal """
+    is_ok = True
+    for i in range(A.shape[0]):
+        for k in range(A.shape[1]):
+            if np.abs(i - k) > 1:
+                if A[i, k] > epsilon:
+                    is_ok = False
+    return is_ok
+
+
 class TestSVD(unittest.TestCase):
     """ Test SVD functions """
-    def _compare_mat(self, A, B, epsilon=1e-7):
-        """ Compares A and B, and returns True if they are very similar """
-        return np.all((A - B) < epsilon)
-
-    def _is_diag(self, A, epsilon=1e-7):
-        return np.all((A - np.diag(np.diag(A))) < epsilon)
-
-    def _is_tridiagonal(self, A, epsilon=1e-7):
-        is_ok = True
-        for i in range(A.shape[0]):
-            for k in range(A.shape[1]):
-                if np.abs(i - k) > 1:
-                    if A[i, k] > epsilon:
-                        is_ok = False
-        return is_ok
-
     def test_givens(self):
         """ test _givens function """
         eps = 1e-7
@@ -271,7 +289,7 @@ class TestSVD(unittest.TestCase):
             b = np.random.randn(1)[0] * 5
             c, s = _givens(a, b)
             rot = np.array([[c, -s], [s, c]])
-            assert self._compare_mat(rot @ rot.T, np.eye(2), eps)
+            assert _compare_mat(rot @ rot.T, np.eye(2), eps)
             assert (rot @ np.array([[a], [b]]))[1] < eps
 
     def test_divens_diag(self):
@@ -283,18 +301,18 @@ class TestSVD(unittest.TestCase):
             c, s = _givens_diag(a1, a2, b)
             rot = np.array([[c, -s], [s, c]])
             A = np.array([[a1, b], [b, a2]])
-            assert self._is_diag(rot @ A @ rot.T)
+            assert _is_diag(rot @ A @ rot.T)
 
     def test_householder_tridiagonal(self):
         for i in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
             L, T, R = _householder_tridiagonal(A)
-            assert self._is_tridiagonal(T)
-            assert self._compare_mat(A, L @ T @ R)
+            assert _is_tridiagonal(T)
+            assert _compare_mat(A, L @ T @ R)
 
     def test_qr_symm_tridiag(self):
-        eps = 1e-8
+        eps = _ACCURACY
         for i in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
@@ -303,17 +321,52 @@ class TestSVD(unittest.TestCase):
             D = np.diag(acq_eigvals)
             exp_eigvals = np.sort(np.linalg.eigvals(T))
             acq_eigvals = np.sort(acq_eigvals)
-            assert self._compare_mat(T, Q @ D @ Q.T, epsilon=eps)
-            assert self._compare_mat(exp_eigvals, acq_eigvals, epsilon=eps)
+            assert _compare_mat(T, Q @ D @ Q.T, epsilon=eps)
+            assert _compare_mat(exp_eigvals, acq_eigvals, epsilon=eps)
 
     def test_svd(self):
-        eps = 1e-8
+        eps = _ACCURACY
         for i in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
             L, D, R = svd(A)
             exp_eigvals = np.sort(np.linalg.eigvals(A))
             acq_eigvals = np.sort(np.diag(D))
-            assert self._is_diag(D)
-            assert self._compare_mat(A, L @ D @ R, epsilon=eps)
-            assert self._compare_mat(exp_eigvals, acq_eigvals, epsilon=eps)
+            assert _is_diag(D)
+            assert _compare_mat(A, L @ D @ R, epsilon=eps)
+            assert _compare_mat(exp_eigvals, acq_eigvals, epsilon=eps)
+
+
+def _determine_epsilon_for_accuracy(accuracy=1e-4):
+    current_eps = accuracy
+    success = False
+    n_trials = 200
+
+    while not success:
+        success = True
+        mean_n_iter = 0
+        try:
+            for _ in range(n_trials):
+                X = np.random.randn(22, 825)
+                A = X @ X.T
+                L, D, R, n_iter = svd(A, epsilon=current_eps, with_n_iter=True)
+                mean_n_iter += n_iter / n_trials
+                exp_eigvals = np.sort(np.linalg.eigvals(A))
+                acq_eigvals = np.sort(np.diag(D))
+                assert _compare_mat(A, L @ D @ R, epsilon=accuracy)
+                assert _compare_mat(exp_eigvals, acq_eigvals, epsilon=accuracy)
+        except AssertionError:
+            success = False
+            current_eps = current_eps * 0.1
+            if current_eps < 1e-15:
+                raise RuntimeError("Max number of iterations reached")
+    return current_eps, mean_n_iter
+
+
+def _epsilon_sweep():
+    for accuracy in [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]:
+        required_eps, n_iter = _determine_epsilon_for_accuracy(accuracy)
+        print(f"For accuracy: {accuracy:.2E}, required epsilon: {required_eps:.2E}, n_iter: {n_iter:.1f}")
+
+if __name__ == "__main__":
+    _epsilon_sweep()
