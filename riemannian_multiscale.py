@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 from filters import butter_fir_filter
 from eig import gevd
-from utils import quantize, logm
+from utils import quantize
+from svd import logm
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
