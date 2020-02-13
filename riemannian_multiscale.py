@@ -4,13 +4,11 @@
 
 import numpy as np
 from pyriemann.utils import mean, base
-import scipy
 from tqdm import tqdm
 from multiprocessing import Pool
 from functools import partial
 
 from filters import butter_fir_filter
-from eig import gevd
 from utils import quantize
 from svd import logm
 from sos_filt import quant_sos_filt, prepare_quant_filter
@@ -96,13 +94,13 @@ class RiemannianMultiscale:
 
         n_tr_trial, n_channel, _ = data.shape
         self.n_channel = n_channel
-        self.n_riemann = int((n_channel+1)*n_channel/2)
+        self.n_riemann = int((n_channel + 1) * n_channel / 2)
 
         if self.use_par:
             with Pool() as p:
                 cov_mat = np.array(list(tqdm(p.imap(self._par_cov_mat, data),
-                                            desc="Compute Covariance matrices", total=n_tr_trial,
-                                            leave=False)))
+                                             desc="Compute Covariance matrices", total=n_tr_trial,
+                                             leave=False)))
         else:
             cov_mat = np.array(list(tqdm(map(self._par_cov_mat, data),
                                          desc="Compute Covariance matrices", total=n_tr_trial,
@@ -178,8 +176,6 @@ class RiemannianMultiscale:
         feat: array, shape: if vectorized: (n_freq x n_riemann)
                             else           (n_freq , n_riemann)
         '''
-        n_samples = data.shape[1]
-
         feat = np.zeros((self.n_freq, self.n_riemann))
 
         for freq_idx in range(self.n_freq):
@@ -210,7 +206,7 @@ class RiemannianMultiscale:
         '''
         _, N = mat.shape
 
-        no_elements = ((N+1)*N/2)
+        no_elements = ((N + 1) * N / 2)
         no_elements = int(no_elements)
         out_vec = np.zeros(no_elements)
 
@@ -222,7 +218,7 @@ class RiemannianMultiscale:
         idx = N
         for col in range(1, N):
             for row in range(0, col):
-                out_vec[idx] = sqrt2*mat[row, col]
+                out_vec[idx] = sqrt2 * mat[row, col]
                 idx += 1
         return out_vec
 
@@ -234,7 +230,7 @@ class RiemannianMultiscale:
         """ Compute the regularized covariance matrix """
         n_samples = data.shape[1]
         n_channel = data.shape[0]
-        return 1/(n_samples-1) * np.dot(data, np.transpose(data)) + self.rho/n_samples*np.eye(n_channel)
+        return 1 / (n_samples - 1) * np.dot(data, np.transpose(data)) + self.rho / n_samples * np.eye(n_channel)
 
     def whitened_kernel(self, mat, c_ref_invsqrtm):
         return self.half_vectorization(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm))

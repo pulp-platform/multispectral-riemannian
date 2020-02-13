@@ -4,15 +4,24 @@ __author__ = "Tibor Schneider"
 __email__ = "sctibor@student.ethz.ch"
 
 import numpy as np
-import unittest
 
 from utils import quantize_to_int, dequantize_to_float, quantize
 
+# used for testing
+from scipy.signal import sosfilt
+import matplotlib.pyplot as plt
+from multiprocessing import Pool
+from tqdm import tqdm
+from filters import load_filterbank, load_bands
+from functools import partial
 
-N_FILTER_BITS = 8
+N_FILTER_BITS = 12
+BIT_RESERVE = 1
+INTERMEDIATE_BITS = 16
+DEFAULT_FORM = 1
+OVERFLOW_WARNING = True
 
-
-def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
+def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_reserve=BIT_RESERVE):
     """ Quantizes the sos filter coefficients and prepares the scale ranges.
 
     Description
@@ -46,6 +55,10 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
 
     n_bits: int
             Number of bits used to represent filter values
+
+    bit_reserve: int
+                 Number of bits to shift the registers, may help when the registers are clipping,
+                 but reduces the accuracy.
 
     Returns
     -------
@@ -85,13 +98,13 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
         b_scale = 2 ** b_shift
 
         # update the output shift now
-        y_shift += b_shift
+        y_shift += b_shift + bit_reserve
 
         # modify the shift for denominators (a), they must be in the same range as the section input
         a_shift = a_shift - (n_bits - 1)
 
         # set the shift for the numerators (b), they get their new range
-        b_shift = -(n_bits - 1)
+        b_shift = -bit_reserve - (n_bits - 1)
 
         # store the values
         scale_coeff[m, 1] = a_scale
@@ -107,8 +120,9 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
 
 
 def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt", n_bits=8,
-                   intermediate_bits=32, filter_bits=N_FILTER_BITS):
-    """ applies sos filter in quantized form (Direct Form 2)
+                   intermediate_bits=INTERMEDIATE_BITS, filter_bits=N_FILTER_BITS,
+                   form=DEFAULT_FORM):
+    """ applies sos filter in quantized form (Direct Form 1 or 2)
 
     Description
     -----------
@@ -116,8 +130,8 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     values to make sure they do not overflow. Also, by doing it like this, we can still use SIMD
     operations in the Mr. Wolf implementation.
 
-    To achieve this goal, we define different scale regions. We use the direct form 2 of the IIR
-    filter (see https://en.wikipedia.org/wiki/Digital_biquad_filter#Direct_form_2). A new scale
+    To achieve this goal, we define different scale regions. We use the direct form 1 of the IIR
+    filter (see https://en.wikipedia.org/wiki/Digital_biquad_filter#Direct_form_1). A new scale
     region is defined after the numerator MACs (b_k). To compute the new scale region, we use the
     scale_coeff at the specific section. By assuming that we still multiply 8 bit values, we just
     shift by 8 bit. The scale factor at the output of section m thus becomes the product of all
@@ -182,6 +196,7 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     assert scale_coeff.shape[1] == 2
     assert mode in ["valid", "same", "full", "sosfilt"]
     assert n_bits == 8
+    assert form in [1, 2]
 
     N = data.shape[0]
     M = coeff.shape[0]
@@ -202,10 +217,6 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
         a_shift[m + 1] = -comp_shift[m, 1]
         b_shift[m + 1] = -comp_shift[m, 0]
 
-    # values for storing the data.
-    regs = np.zeros((M + 1, 3), dtype=int)
-    y = np.zeros((N_prime, ), dtype=int)
-
     # pad x such that we do not get any index errors
     x = np.zeros((N_prime, ), dtype=int)
     x[:N] = x_quant
@@ -213,31 +224,10 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     # internal representation has n_bits: n_bits * 2 (because we multiply two such numbers together)
     # x = x << (n_bits - 1)
 
-    # main body of the computation
-    for k in range(N_prime):
-        # get the new element
-        regs[0, 0] = x[k]
-
-        # compute all the sections
-        for m in range(1, M + 1):
-            # move the registers
-            regs[m, 2] = regs[m, 1]
-            regs[m, 1] = regs[m, 0]
-            regs[m, 0] = 0
-
-            # add the input from the previous section
-            regs[m, 0] += np.sum(regs[m - 1, :] * b[m - 1, :]) >> b_shift[m - 1]
-
-            # add the self reference
-            regs[m, 0] -= np.sum(regs[m, 1:] * a[m, 1:]) >> a_shift[m]
-
-            # clip the values
-            regs[m] = np.clip(-(1 << (intermediate_bits - 1)),
-                              1 << (intermediate_bits - 1),
-                              regs[m])
-
-        # store the output
-        y[k] = np.sum(regs[M, :] * b[M, :]) >> b_shift[M]
+    if form == 1:
+        y = _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits)
+    else:
+        y = _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits)
 
     # apply the mode
     if mode == "same":
@@ -259,11 +249,104 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     return result
 
 
-def _plot(band_id, coeff):
+def _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits):
+    """ apply sos filter in direct form 1 """
+    show_warning = OVERFLOW_WARNING
+    M = a.shape[0]
+    N_prime = x.shape[0]
+
+    regs = np.zeros((M, 3), dtype=int)
+    y = np.zeros((N_prime, ), dtype=int)
+
+    # main body of the computation
+    for k in range(N_prime):
+        # make input registers
+        regs[0, 2] = regs[0, 1]
+        regs[0, 1] = regs[0, 0]
+        regs[0, 0] = x[k]
+
+        # do sum of all sections
+        for m in range(1, M):
+            # move the registers
+            regs[m, 2] = regs[m, 1]
+            regs[m, 1] = regs[m, 0]
+            regs[m, 0] = 0
+
+            # add the input from the previous section
+            regs[m, 0] += np.sum(regs[m - 1, :] * b[m, :]) >> b_shift[m]
+
+            # add the self reference
+            regs[m, 0] -= np.sum(regs[m, 1:] * a[m, 1:]) >> a_shift[m]
+
+            # error handling
+            if show_warning and np.any(np.abs(regs[m]) >= (1 << intermediate_bits - 1)):
+                print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {regs[m]=}")
+                show_warning = False
+
+            # clip the values
+            regs[m] = np.clip(-(1 << (intermediate_bits - 1)),
+                              1 << (intermediate_bits - 1),
+                              regs[m])
+
+        # store the output
+        y[k] = regs[M - 1, 0]
+
+    return y
+
+
+def _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits):
+    """ apply sos filter in direct form 1 """
+    show_warning = OVERFLOW_WARNING
+    M = a.shape[0]
+    N_prime = x.shape[0]
+
+    regs = np.zeros((M, 3), dtype=int)
+    y = np.zeros((N_prime, ), dtype=int)
+
+    # main body of the computation
+    for k in range(N_prime):
+        # get the new element
+        regs[0, 0] = x[k]
+
+        # compute all the sections
+        for m in range(1, M):
+            # move the registers
+            regs[m, 2] = regs[m, 1]
+            regs[m, 1] = regs[m, 0]
+            regs[m, 0] = 0
+
+            # add the input from the previous section
+            regs[m, 0] += np.sum(regs[m - 1, :] * b[m - 1, :]) >> b_shift[m - 1]
+
+            # add the self reference
+            regs[m, 0] -= np.sum(regs[m, 1:] * a[m, 1:]) >> a_shift[m]
+
+            # error handling
+            if show_warning and np.any(np.abs(regs[m]) >= (1 << intermediate_bits - 1)):
+                print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {regs[m]=}")
+                show_warning = False
+
+            # clip the values
+            regs[m] = np.clip(-(1 << (intermediate_bits - 1)),
+                              1 << (intermediate_bits - 1),
+                              regs[m])
+
+        # store the output
+        y[k] = np.sum(regs[M - 1, :] * b[M - 1, :]) >> b_shift[M - 1]
+
+    return y
+
+
+def _plot(band, coeff):
     from scipy.signal import sosfilt
     import matplotlib.pyplot as plt
 
-    for w in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]:
+    w_below = band[0] / 2
+    w_inside = (band[0] + band[1]) / 2
+    w_above = band[1] * 2
+    freqs = [w_below, band[0], w_inside, band[1], w_above]
+
+    for w in freqs:
         x = np.sin(w * np.array(range(1000)))
         y_opt = sosfilt(coeff, x)
 
@@ -278,43 +361,41 @@ def _plot(band_id, coeff):
 
         plt.plot(y_exp, label="expected")
         plt.plot(y_acq, label="acquired")
-        plt.plot(y_opt, label="optimal")
         plt.legend()
+        plt.title(f"freq: {w}, band: {band}")
         plt.show()
 
 
-def _sweep(band_id, coeff, freqs=None, N=500, T=1000, fs=250):
-    from scipy.signal import sosfilt
-    import matplotlib.pyplot as plt
-    from multiprocessing import Pool
-    import tqdm.tqdm
+def _par_measure(w, t, coeff):
+    x = np.cos(w * t)
 
+    y_exp_f = sosfilt(coeff, x)
+
+    y_scale = np.abs(y_exp_f).max()
+    y_scale = 2 ** np.ceil(np.log2(y_scale))
+
+    quant_filter = prepare_quant_filter(coeff, 1, y_scale)
+
+    y_acq = quant_sos_filt(x, quant_filter, 1, y_scale)
+    y_exp_q = sosfilt(quant_filter[0], x)
+
+    a_acq = np.abs(y_acq[-100:]).max()
+    a_exp_f = np.abs(y_exp_f[-100:]).max()
+    a_exp_q = np.abs(y_exp_q[-100:]).max()
+
+    return np.array([a_acq, a_exp_f, a_exp_q])
+
+
+def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     if freqs is None:
         freqs = np.linspace(0, np.pi / 2, N)
 
     t = np.array(range(T))
 
-    def measure(w):
-        x = np.cos(w * t)
-
-        y_exp_f = sosfilt(coeff, x)
-
-        y_scale = np.abs(y_exp_f).max()
-        y_scale = 2 ** np.ceil(np.log2(y_scale))
-
-        quant_filter = prepare_quant_filter(coeff, 1, y_scale)
-
-        y_acq = quant_sos_filt(x, quant_filter, 1, y_scale)
-        y_exp_q = sosfilt(quant_filter[0], x)
-
-        a_acq = np.abs(y_acq[-100:]).max()
-        a_exp_f = np.abs(y_exp_f[-100:]).max()
-        a_exp_q = np.abs(y_exp_q[-100:]).max()
-
-        return np.array([a_acq, a_exp_f, a_exp_q])
-
     with Pool() as p:
-        measurement = list(tqdm(p.imap(measure, freqs, desc=f"Band {band_id}")))
+        measure_fun = partial(_par_measure, t=t, coeff=coeff)
+        measurement = list(tqdm(p.imap(measure_fun, freqs), desc=f"Band {band_id}",
+                                total=len(freqs)))
 
     measurement = np.array(measurement)
     ampl_acq = measurement[:, 0]
@@ -323,20 +404,22 @@ def _sweep(band_id, coeff, freqs=None, N=500, T=1000, fs=250):
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    ax.plot(freqs, ampl_acq, label="fully quantized")
-    ax.plot(freqs, ampl_exp_q, label="quantized weights")
     ax.plot(freqs, ampl_exp_f, label="folat weights")
+    ax.plot(freqs, ampl_exp_q, label="quantized weights")
+    ax.plot(freqs, ampl_acq, label="fully quantized")
     ax.legend()
     ax.set_yscale('log')
     plt.show()
 
+
 def _test():
     """ test function to run the frequency sweep on all filterbands """
-    from filters import load_filterbank
+    bands = load_bands([2], f_s=250)
     bank = load_filterbank([2], fs=250, order=2)
-    for i, coeff in enumerate(bank):
-        #_plot(i, coeff)
-        _sweep(i, coeff)
+    for band, coeff in zip(bands, bank):
+        # _plot(band, coeff)
+        _sweep(band, coeff)
+
 
 if __name__ == "__main__":
     _test()
