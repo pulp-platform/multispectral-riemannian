@@ -18,6 +18,7 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
 QUANTIZED = True
+RIEM_OPT = "Riemann"
 BANDS = [2] # [2, 4, 8, 16, 32]
 CROSS_VALIDATION = False
 CV_NO_SPLITS = 5
@@ -29,9 +30,9 @@ def main():
     """ main function """
 
     if QUANTIZED:
-        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED)
+        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT)
     else:
-        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED)
+        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT)
 
 
     # success rate sum over all subjects

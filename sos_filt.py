@@ -67,8 +67,6 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
     # check the data
     assert len(coeff.shape) == 2
     assert coeff.shape[1] == 6
-    np.testing.assert_almost_equal(np.log2(x_scale / y_scale),
-                                   np.round(np.log2(x_scale / y_scale)))
 
     M = coeff.shape[0]
 

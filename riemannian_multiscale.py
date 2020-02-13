@@ -11,6 +11,7 @@ from filters import butter_fir_filter
 from eig import gevd
 from utils import quantize
 from svd import logm
+from sos_filt import quant_sos_filt, prepare_quant_filter
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
@@ -301,7 +302,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                  num_bits=8, bitshift_scale=True):
 
         super(QuantizedRiemannianMultiscale, self).__init__(filter_bank, temp_windows, riem_opt=riem_opt,
-                                                         rho=rho, vectorized=vectorized)
+                                                            rho=rho, vectorized=vectorized)
         self.num_bits = num_bits
         self.bitshift_scale = bitshift_scale
 
@@ -310,30 +311,12 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         self.scale_cov_mat = np.zeros((self.n_freq, ))
         self.scale_logm_out = 0
         self.scale_features = 0
-        self.scale_filter_num = np.zeros(filter_bank.shape[:2])
-        self.scale_filter_den = np.zeros(filter_bank.shape[:2])
+        self.quant_filter_bank = []
 
         self.min_eigv = 1e10
 
         # filters must be second order sections
         assert self.filter_bank.shape[2] == 6
-
-        # Determine range for filterbands and quantize them.
-        # For each filter sections, we determine a different range, both for the numerator and the denominator.
-        for band in range(self.filter_bank.shape[0]):
-            for sec in range(self.filter_bank.shape[1]):
-                # compute the scale factor
-                scale_num = np.abs(self.filter_bank[band, sec, :3]).max()
-                scale_den = np.abs(self.filter_bank[band, sec, 3:]).max()
-                # filters must be scaled with a power of two
-                scale_num = 2 ** np.ceil(np.log2(scale_num))
-                scale_den = 2 ** np.ceil(np.log2(scale_den))
-                # store the scale factor
-                self.scale_filter_num[band, sec] = scale_num
-                self.scale_filter_den[band, sec] = scale_num
-                # quantize all filter banks accordingly (round them correctly)
-                self.filter_bank[band, sec, :3] = self._quantize(self.filter_bank[band, sec, :3], scale_num, do_round=True)
-                self.filter_bank[band, sec, 3:] = self._quantize(self.filter_bank[band, sec, 3:], scale_den, do_round=True)
 
         # Go into monitor_ranges mode
         self.monitor_ranges = True
@@ -373,9 +356,14 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                 # Sw is also a power of two
                 # Thus, Sy / Sx must be a power of two. Since Sx is fixed, we need to change Sy.
                 # Sy = Sx * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx))
-                k = np.ceil(np.log2(self.scale_filter_out[band] / self.scale_input))
-                self.scale_filter_out[band] = self.scale_input * 2 ** k
+                k = int(np.ceil(np.log2(self.scale_filter_out[band] / self.scale_input)))
+                self.scale_filter_out[band] = self.scale_input * (2 ** k)
 
+        # prepare the filter quantization
+        for band in range(self.filter_bank.shape[0]):
+            self.quant_filter_bank.append(prepare_quant_filter(self.filter_bank[band],
+                                                               self.scale_input,
+                                                               self.scale_filter_out[band]))
 
         # set the flag to monitor the range to false, the modul can now be used
         self.monitor_ranges = False
@@ -396,10 +384,18 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
             data = self._quantize(data, self.scale_input, do_round=True)
 
         # apply the filter
-        output = butter_fir_filter(data, self.filter_bank[freq_idx])
-        assert not np.any(np.isnan(output))
+        if self.monitor_ranges:
+            output = butter_fir_filter(data, self.filter_bank[freq_idx])
+        else:
+            output = np.zeros_like(data)
+            for ch in range(data.shape[0]):
+                output[ch] = quant_sos_filt(data[ch], self.quant_filter_bank[freq_idx],
+                                            self.scale_input,
+                                            self.scale_filter_out[freq_idx])
+        # assert not np.any(np.isnan(output))
 
         # measure the output scale or quantize
+        # bitshift scale will be applied at the end of the monitoring step
         if self.monitor_ranges:
             self.scale_filter_out[freq_idx] = max(self.scale_filter_out[freq_idx], np.abs(output).max())
         else:
