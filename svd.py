@@ -269,7 +269,7 @@ class TestSVD(unittest.TestCase):
     def test_givens(self):
         """ test _givens function """
         eps = 1e-7
-        for i in range(10):
+        for _ in range(10):
             a = np.random.randn(1)[0] * 5
             b = np.random.randn(1)[0] * 5
             c, s = _givens(a, b)
@@ -279,7 +279,7 @@ class TestSVD(unittest.TestCase):
 
     def test_divens_diag(self):
         """ test _givens_diag function """
-        for i in range(100):
+        for _ in range(100):
             a1 = np.random.randn(1)[0] * 5
             a2 = np.random.randn(1)[0] * 5
             b = np.random.randn(1)[0] * 4
@@ -289,7 +289,8 @@ class TestSVD(unittest.TestCase):
             assert _is_diag(rot @ A @ rot.T)
 
     def test_householder_tridiagonal(self):
-        for i in range(10):
+        """ test _householder_tridiagonal """
+        for _ in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
             L, T, R = _householder_tridiagonal(A)
@@ -297,8 +298,9 @@ class TestSVD(unittest.TestCase):
             assert _compare_mat(A, L @ T @ R)
 
     def test_qr_symm_tridiag(self):
+        """ test _qr_symm_tridiag """
         eps = _ACCURACY
-        for i in range(10):
+        for _ in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
             _, T, _ = _householder_tridiagonal(A)
@@ -310,8 +312,9 @@ class TestSVD(unittest.TestCase):
             assert _compare_mat(exp_eigvals, acq_eigvals, epsilon=eps)
 
     def test_svd(self):
+        """ test svd """
         eps = _ACCURACY
-        for i in range(10):
+        for _ in range(10):
             X = np.random.randn(22, 825)
             A = X @ X.T
             L, D, R = svd(A)
