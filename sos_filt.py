@@ -16,7 +16,7 @@ from filters import load_filterbank, load_bands
 from functools import partial
 
 N_FILTER_BITS = 12
-BIT_RESERVE = 1
+BIT_RESERVE = 0
 INTERMEDIATE_BITS = 16
 DEFAULT_FORM = 1
 OVERFLOW_WARNING = True
@@ -255,38 +255,41 @@ def _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits):
     M = a.shape[0]
     N_prime = x.shape[0]
 
+    clip_range = 1 << (intermediate_bits - 1)
+
     regs = np.zeros((M, 3), dtype=int)
     y = np.zeros((N_prime, ), dtype=int)
 
     # main body of the computation
     for k in range(N_prime):
         # make input registers
-        regs[0, 2] = regs[0, 1]
-        regs[0, 1] = regs[0, 0]
+        # regs[0, 2] = regs[0, 1]
+        # regs[0, 1] = regs[0, 0]
+        regs[0, 1:] = regs[0, :-1]
         regs[0, 0] = x[k]
 
         # do sum of all sections
         for m in range(1, M):
             # move the registers
-            regs[m, 2] = regs[m, 1]
-            regs[m, 1] = regs[m, 0]
-            regs[m, 0] = 0
+            # regs[m, 2] = regs[m, 1]
+            # regs[m, 1] = regs[m, 0]
+            regs[m, 1:] = regs[m, :-1]
 
             # add the input from the previous section
-            regs[m, 0] += np.sum(regs[m - 1, :] * b[m, :]) >> b_shift[m]
+            acc = np.dot(regs[m - 1, :], b[m, :]) >> b_shift[m]
 
             # add the self reference
-            regs[m, 0] -= np.sum(regs[m, 1:] * a[m, 1:]) >> a_shift[m]
+            acc -= np.dot(regs[m, 1:], a[m, 1:]) >> a_shift[m]
 
             # error handling
-            if show_warning and np.any(np.abs(regs[m]) >= (1 << intermediate_bits - 1)):
-                print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {regs[m]=}")
-                show_warning = False
+            if np.abs(acc) >= clip_range:
+                # clip the values
+                acc = np.clip(-clip_range, clip_range, acc)
+                if show_warning:
+                    print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {m=}, {acc=}")
+                    show_warning = False
 
-            # clip the values
-            regs[m] = np.clip(-(1 << (intermediate_bits - 1)),
-                              1 << (intermediate_bits - 1),
-                              regs[m])
+            regs[m, 0] = acc
 
         # store the output
         y[k] = regs[M - 1, 0]
@@ -300,6 +303,8 @@ def _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits):
     M = a.shape[0]
     N_prime = x.shape[0]
 
+    clip_range = 1 << (intermediate_bits - 1)
+
     regs = np.zeros((M, 3), dtype=int)
     y = np.zeros((N_prime, ), dtype=int)
 
@@ -311,28 +316,26 @@ def _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits):
         # compute all the sections
         for m in range(1, M):
             # move the registers
-            regs[m, 2] = regs[m, 1]
-            regs[m, 1] = regs[m, 0]
-            regs[m, 0] = 0
+            regs[m, 1:] = regs[m, :-1]
 
             # add the input from the previous section
-            regs[m, 0] += np.sum(regs[m - 1, :] * b[m - 1, :]) >> b_shift[m - 1]
+            acc = np.dot(regs[m - 1, :], b[m - 1, :]) >> b_shift[m - 1]
 
             # add the self reference
-            regs[m, 0] -= np.sum(regs[m, 1:] * a[m, 1:]) >> a_shift[m]
+            acc -= np.dot(regs[m, 1:], a[m, 1:]) >> a_shift[m]
 
             # error handling
-            if show_warning and np.any(np.abs(regs[m]) >= (1 << intermediate_bits - 1)):
-                print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {regs[m]=}")
-                show_warning = False
+            if np.abs(acc) >= clip_range:
+                # clip the values
+                acc = np.clip(-clip_range, clip_range, acc)
+                if show_warning:
+                    print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {m=}, {acc=}")
+                    show_warning = False
 
-            # clip the values
-            regs[m] = np.clip(-(1 << (intermediate_bits - 1)),
-                              1 << (intermediate_bits - 1),
-                              regs[m])
+            regs[m, 0] = acc
 
         # store the output
-        y[k] = np.sum(regs[M - 1, :] * b[M - 1, :]) >> b_shift[M - 1]
+        y[k] = np.dot(regs[M - 1, :], b[M - 1, :]) >> b_shift[M - 1]
 
     return y
 
@@ -371,12 +374,13 @@ def _par_measure(w, t, coeff):
 
     y_exp_f = sosfilt(coeff, x)
 
+    x_scale = 2
     y_scale = np.abs(y_exp_f).max()
     y_scale = 2 ** np.ceil(np.log2(y_scale))
 
-    quant_filter = prepare_quant_filter(coeff, 1, y_scale)
+    quant_filter = prepare_quant_filter(coeff, x_scale, y_scale)
 
-    y_acq = quant_sos_filt(x, quant_filter, 1, y_scale)
+    y_acq = quant_sos_filt(x, quant_filter, x_scale, y_scale)
     y_exp_q = sosfilt(quant_filter[0], x)
 
     a_acq = np.abs(y_acq[-100:]).max()
@@ -417,7 +421,7 @@ def _test():
     bands = load_bands([2], f_s=250)
     bank = load_filterbank([2], fs=250, order=2)
     for band, coeff in zip(bands, bank):
-        # _plot(band, coeff)
+        #_plot(band, coeff)
         _sweep(band, coeff)
 
 

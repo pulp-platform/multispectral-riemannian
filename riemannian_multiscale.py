@@ -380,13 +380,10 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         if self.monitor_ranges:
             output = butter_fir_filter(data, self.filter_bank[freq_idx])
         else:
-            _filt = partial(quant_sos_filt,
-                            quant_filter=self.quant_filter_bank[freq_idx],
-                            scale_data=self.scale_input,
-                            scale_output=self.scale_filter_out[freq_idx])
-            output = np.array(list(map(_filt, data)))
-            #with Pool() as p:
-            #    output = np.array(p.map(_filt, data))
+            output = np.zeros_like(data)
+            for ch in range(data.shape[0]):
+                output[ch] = quant_sos_filt(data[ch], self.quant_filter_bank[freq_idx],
+                                            self.scale_input, self.scale_filter_out[freq_idx])
         # assert not np.any(np.isnan(output))
 
         # measure the output scale or quantize
