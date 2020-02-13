@@ -6,6 +6,8 @@ import numpy as np
 from pyriemann.utils import mean, base
 import scipy
 from tqdm import tqdm
+from multiprocessing import Pool
+from functools import partial
 
 from filters import butter_fir_filter
 from eig import gevd
@@ -66,6 +68,7 @@ class RiemannianMultiscale:
         elif riem_opt in ['Riemann_Euclid', 'Whitened_Euclid']:
             self.mean_metric = 'euclid'
         self.riem_opt = riem_opt
+        self.use_par = True
 
         # regularization
         self.rho = rho
@@ -95,58 +98,37 @@ class RiemannianMultiscale:
         self.n_channel = n_channel
         self.n_riemann = int((n_channel+1)*n_channel/2)
 
-        cov_mat = np.zeros(
-            (n_tr_trial, self.n_temp, self.n_freq, n_channel, n_channel))
+        if self.use_par:
+            with Pool() as p:
+                cov_mat = np.array(list(tqdm(p.imap(self._par_cov_mat, data),
+                                            desc="Compute Covariance matrices", total=n_tr_trial,
+                                            leave=False)))
+        else:
+            cov_mat = np.array(list(tqdm(map(self._par_cov_mat, data),
+                                         desc="Compute Covariance matrices", total=n_tr_trial,
+                                         leave=False)))
 
-        with tqdm(desc="Compute covariance matrices", total=n_tr_trial * self.n_temp * self.n_freq, leave=False) as bar:
-
-            # calculate training covariance matrices
-            for trial_idx in range(n_tr_trial):
-
-                for temp_idx in range(self.n_temp):
-                    t_start, t_end = self.temp_windows[temp_idx, 0], self.temp_windows[temp_idx, 1]
-
-                    for freq_idx in range(self.n_freq):
-                        # filter signal
-                        max_pre = np.abs(data[trial_idx, :, t_start:t_end]).max()
-
-                        data_filter = self._filter_signal(data[trial_idx, :, t_start:t_end], freq_idx)
-
-                        # regularized covariance matrix
-                        cov_mat[trial_idx, temp_idx, freq_idx] = self._reg_cov_mat(data_filter, freq_idx)
-
-                        bar.update()
-
-        with tqdm(desc="Determine C_ref", total=self.n_freq, leave=False) as bar:
-
-            # calculate mean covariance matrix
-            self.c_ref_invsqrtm = np.zeros((self.n_freq, n_channel, n_channel))
-
-            for freq_idx in range(self.n_freq):
-
-                if self.riem_opt == 'No_Adaptation':
-                    self.c_ref_invsqrtm[freq_idx] = np.eye(n_channel)
-                else:
-                    # Mean covariance matrix over all trials and temp winds per frequency band
-                    cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, n_channel, n_channel),
-                                                metric=self.mean_metric)
-                    self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
-
-                bar.update()
+        # calculate mean covariance matrix
+        self.c_ref_invsqrtm = np.zeros((self.n_freq, n_channel, n_channel))
+        for freq_idx in tqdm(list(range(self.n_freq)), desc="Compute mean covariance matrix", leave=False):
+            if self.riem_opt == 'No_Adaptation':
+                self.c_ref_invsqrtm[freq_idx] = np.eye(n_channel)
+            else:
+                # Mean covariance matrix over all trials and temp winds per frequency band
+                cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, n_channel, n_channel),
+                                               metric=self.mean_metric)
+                self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
 
         # calculate training features
-        train_feat = np.zeros(
-            (n_tr_trial, self.n_temp, self.n_freq, self.n_riemann))
-
-        with tqdm(desc="computing SVD", total=n_tr_trial * self.n_temp * self.n_freq, leave=False) as bar:
-
-            for trial_idx in range(n_tr_trial):
-                for temp_idx in range(self.n_temp):
-                    for freq_idx in range(self.n_freq):
-
-                        train_feat[trial_idx, temp_idx, freq_idx] = self.riem_kernel(
-                            cov_mat[trial_idx, temp_idx, freq_idx], self.c_ref_invsqrtm[freq_idx])
-                        bar.update()
+        if self.use_par:
+            with Pool() as p:
+                train_feat = np.array(list(tqdm(p.imap(self._par_riemannian, cov_mat),
+                                                desc="Compute Riemannian kernel", total=n_tr_trial,
+                                                leave=False)))
+        else:
+            train_feat = np.array(list(tqdm(map(self._par_riemannian, cov_mat),
+                                            desc="Compute Riemannian kernel", total=n_tr_trial,
+                                            leave=False)))
 
         if self.vectorized:
             return train_feat.reshape(n_tr_trial, -1)
@@ -170,21 +152,13 @@ class RiemannianMultiscale:
 
         feat = np.zeros((n_trial, self.n_temp, self.n_freq, self.n_riemann))
 
-        # calculate training covariance matrices
-        for trial_idx in range(n_trial):
-
-            for temp_idx in range(self.n_temp):
-                t_start, t_end = self.temp_windows[temp_idx, 0], self.temp_windows[temp_idx, 1]
-
-                for freq_idx in range(self.n_freq):
-                    # filter signal
-                    data_filter = self._filter_signal(data[trial_idx, :, t_start:t_end], freq_idx)
-
-                    # regularized covariance matrix
-                    cov_mat = self._reg_cov_mat(data_filter, freq_idx)
-
-                    # compute the riemannian kernel
-                    feat[trial_idx, temp_idx, freq_idx] = self.riem_kernel(cov_mat, self.c_ref_invsqrtm[freq_idx])
+        with Pool() as p:
+            cov_mat = np.array(list(tqdm(p.imap(self._par_cov_mat, data),
+                                         desc="Compute Covariance matrices", total=n_trial,
+                                         leave=False)))
+            feat = np.array(list(tqdm(p.imap(self._par_riemannian, cov_mat),
+                                      desc="Compute Riemannian kernel", total=n_trial,
+                                      leave=False)))
 
         if self.vectorized:
             return feat.reshape(n_trial, -1)
@@ -268,6 +242,27 @@ class RiemannianMultiscale:
     def log_whitened_kernel(self, mat, c_ref_invsqrtm):
         return self.half_vectorization(base.logm(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)))
 
+    def _par_cov_mat(self, data):
+        """ function to compute the covariance matrix for a single sample """
+        cov_mat = np.zeros((self.n_temp, self.n_freq, self.n_channel, self.n_channel))
+        for temp_idx in range(self.n_temp):
+            t_start, t_end = self.temp_windows[temp_idx, 0], self.temp_windows[temp_idx, 1]
+            for freq_idx in range(self.n_freq):
+                # filter signal
+                data_filter = self._filter_signal(data[:, t_start:t_end], freq_idx)
+                # regularized covariance matrix
+                cov_mat[temp_idx, freq_idx] = self._reg_cov_mat(data_filter, freq_idx)
+        return cov_mat
+
+    def _par_riemannian(self, data):
+        """ function to compute a the riemann kernel for a single sample """
+        train_feat = np.zeros((self.n_temp, self.n_freq, self.n_riemann))
+        for temp_idx in range(self.n_temp):
+            for freq_idx in range(self.n_freq):
+                train_feat[temp_idx, freq_idx] = self.riem_kernel(data[temp_idx, freq_idx],
+                                                                  self.c_ref_invsqrtm[freq_idx])
+        return train_feat
+
 
 class QuantizedRiemannianMultiscale(RiemannianMultiscale):
     """ Quantized Riemannian feature multiscale class
@@ -343,6 +338,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         """ Determine all scale ranges of the network and quantize the filters """
         # set the flag to monitor the ranges to true
         self.monitor_ranges = True
+        self.use_par = False
 
         # call fit
         features = super(QuantizedRiemannianMultiscale, self).fit(data)
@@ -366,6 +362,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                                                                self.scale_filter_out[band]))
 
         # set the flag to monitor the range to false, the modul can now be used
+        self.use_par = True
         self.monitor_ranges = False
 
     def _quantize(self, data, factor, do_round=False, num_bits=None):
@@ -387,11 +384,13 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         if self.monitor_ranges:
             output = butter_fir_filter(data, self.filter_bank[freq_idx])
         else:
-            output = np.zeros_like(data)
-            for ch in range(data.shape[0]):
-                output[ch] = quant_sos_filt(data[ch], self.quant_filter_bank[freq_idx],
-                                            self.scale_input,
-                                            self.scale_filter_out[freq_idx])
+            _filt = partial(quant_sos_filt,
+                            quant_filter=self.quant_filter_bank[freq_idx],
+                            scale_data=self.scale_input,
+                            scale_output=self.scale_filter_out[freq_idx])
+            output = np.array(list(map(_filt, data)))
+            #with Pool() as p:
+            #    output = np.array(p.map(_filt, data))
         # assert not np.any(np.isnan(output))
 
         # measure the output scale or quantize

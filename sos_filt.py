@@ -9,7 +9,7 @@ import unittest
 from utils import quantize_to_int, dequantize_to_float, quantize
 
 
-N_FILTER_BITS = 10
+N_FILTER_BITS = 8
 
 
 def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS):
@@ -263,9 +263,7 @@ def _plot(band_id, coeff):
     from scipy.signal import sosfilt
     import matplotlib.pyplot as plt
 
-
     for w in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]:
-        #x = np.random.randn(825)
         x = np.sin(w * np.array(range(1000)))
         y_opt = sosfilt(coeff, x)
 
@@ -288,7 +286,8 @@ def _plot(band_id, coeff):
 def _sweep(band_id, coeff, freqs=None, N=500, T=1000, fs=250):
     from scipy.signal import sosfilt
     import matplotlib.pyplot as plt
-    from p_tqdm import p_map
+    from multiprocessing import Pool
+    import tqdm.tqdm
 
     if freqs is None:
         freqs = np.linspace(0, np.pi / 2, N)
@@ -314,7 +313,9 @@ def _sweep(band_id, coeff, freqs=None, N=500, T=1000, fs=250):
 
         return np.array([a_acq, a_exp_f, a_exp_q])
 
-    measurement = p_map(measure, list(freqs), desc=f"Band {band_id}")
+    with Pool() as p:
+        measurement = list(tqdm(p.imap(measure, freqs, desc=f"Band {band_id}")))
+
     measurement = np.array(measurement)
     ampl_acq = measurement[:, 0]
     ampl_exp_f = measurement[:, 1]
