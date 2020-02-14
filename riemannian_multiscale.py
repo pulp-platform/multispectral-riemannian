@@ -3,6 +3,7 @@
 '''	Functions used for calculating the Riemannian features'''
 
 import numpy as np
+from collections import OrderedDict
 from pyriemann.utils import mean, base
 from tqdm import tqdm
 from multiprocessing import Pool
@@ -15,6 +16,8 @@ from sos_filt import quant_sos_filt, prepare_quant_filter
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
+
+FIXPOINT_IIR_IMPLEMENTATION = False
 
 
 class RiemannianMultiscale:
@@ -299,9 +302,8 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
         self.scale_input = 0
         self.scale_filter_out = np.zeros((self.n_freq, ))
-        self.scale_cov_mat = np.zeros((self.n_freq, ))
-        self.scale_logm_out = 0
         self.scale_features = 0
+        self.scale_logm_out = 0
         self.quant_filter_bank = []
 
         self.min_eigv = 1e10
@@ -330,6 +332,56 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         features = self._output_quant(features)
         return features
 
+    def onetrial_feature_with_intermediate(self, data):
+        """ Returns an ordered dict containing the results of all intermediate steps of the computation """
+        assert not self.monitor_ranges, "Call \"self.determine_range\" before using \"self.onetrial_feature_with_intermediate\""
+
+        C, T = data.shape
+
+        result = OrderedDict()
+
+        # take only the desired part of the input
+        assert len(self.temp_windows) == 1
+        t_start, t_end = self.temp_windows[0]
+        x = data[:, t_start:t_end]
+        result["input"] = x
+
+        # apply input quantization
+        x = self._quantize(x, self.scale_input, do_round=True)
+        result["input_quant"] = x
+
+        # apply all filters
+        x_filt = np.array([np.array([quant_sos_filt(channel, quant_filter, self.scale_input)
+                                     for channel in x])
+                           for quant_filter in self.quant_filter_bank])
+        result["filter_out"] = x_filt
+        # filter output is already quantized
+
+        # compute covariance matrix
+        x_cov = np.array([X @ X.T for X in x_filt])
+        result["cov_mat"] = x_cov
+
+        # scale covariance matrix and add offset
+        x_cov_scale = np.array([(X +  np.eye(C) * self.rho) / (T - 1) for X in x_cov])
+        result["cov_mat_scale"] = x_cov_scale
+
+        # transform the covariance matrix with the mean covariance matrix
+        x_cov_transform = np.array([C @ X @ C for X, C in zip(x_cov_scale, self.c_ref_invsqrtm)])
+        result["cov_mat_transform"] = x_cov_transform
+
+        # apply logm
+        x_cov_logm = np.array([logm(X) for X in x_cov_transform])
+        result["cov_mat_logm"] = x_cov_logm
+
+        # apply half-vectorization
+        features = np.array([self.half_vectorization(X) for X in x_cov_logm]).ravel()
+        result["features"] = features
+
+        features = self._output_quant(features)
+        result["features_quant"] = features
+
+        return result
+
     def prepare_quantization(self, data):
         """ Determine all scale ranges of the network and quantize the filters """
         # set the flag to monitor the ranges to true
@@ -350,6 +402,10 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                 # Sy = Sx * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx))
                 k = int(np.ceil(np.log2(self.scale_filter_out[band] / self.scale_input)))
                 self.scale_filter_out[band] = self.scale_input * (2 ** k)
+
+            # make last transformation a power of two
+            k = int(np.ceil(np.log2(self.scale_features / self.scale_logm_out)))
+            self.scale_features = self.scale_logm_out * (2 ** k)
 
         # prepare the filter quantization
         for band in range(self.filter_bank.shape[0]):
@@ -380,10 +436,13 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         if self.monitor_ranges:
             output = butter_fir_filter(data, self.filter_bank[freq_idx])
         else:
-            output = np.zeros_like(data)
-            for ch in range(data.shape[0]):
-                output[ch] = quant_sos_filt(data[ch], self.quant_filter_bank[freq_idx],
-                                            self.scale_input, self.scale_filter_out[freq_idx])
+            if FIXPOINT_IIR_IMPLEMENTATION:
+                output = np.zeros_like(data)
+                for ch in range(data.shape[0]):
+                    output[ch] = quant_sos_filt(data[ch], self.quant_filter_bank[freq_idx],
+                                                self.scale_input)
+            else:
+                output = butter_fir_filter(data, self.quant_filter_bank[freq_idx][0])
         # assert not np.any(np.isnan(output))
 
         # measure the output scale or quantize
@@ -402,7 +461,8 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
         mul_result = np.dot(data, np.transpose(data))
 
-        cov_mat = 1/(n_samples-1) * mul_result + self.rho/n_samples*np.eye(n_channel)
+        # cov_mat = 1/(n_samples-1) * mul_result + self.rho/n_samples*np.eye(n_channel)
+        cov_mat = mul_result + self.rho*np.eye(n_channel)
 
         return cov_mat
 
@@ -420,6 +480,30 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
     def log_whitened_kernel(self, mat, c_ref_invsqrtm):
         #return self.half_vectorization(base.logm(np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)))
         tmp = np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)
+
         # mat_log = base.logm(tmp)
         mat_log = logm(tmp)
+
+        # quantize output
+        if self.monitor_ranges:
+            self.scale_logm_out = max(self.scale_logm_out, np.abs(mat_log).max())
+        else:
+            mat_log = self._quantize(mat_log, self.scale_logm_out)
+
         return self.half_vectorization(mat_log)
+
+    def get_data_dict(self):
+        """ returns all relevant data as a dictionary """
+        return {"riem_opt": self.riem_opt,
+                "temp_windows": self.temp_windows,
+                "input_scale": self.scale_input,
+                "filter_bank": [{"coeff": coeff,
+                                 "coeff_scale": scale,
+                                 "coeff_shift": shift,
+                                 "y_scale": y_scale,
+                                 "y_shift": y_shift}
+                                for coeff, scale, shift, y_scale, y_shift in self.quant_filter_bank],
+                "filter_out_scale": self.scale_filter_out,
+                "cov_mat_rho": self.rho,
+                "c_ref_invsqrtm": self.c_ref_invsqrtm,
+                "features_scale": self.scale_features}

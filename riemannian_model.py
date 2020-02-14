@@ -154,7 +154,7 @@ class RiemannianModel():
 class QuantizedRiemannianModel():
     """ QuantizedRiemannian Model """
     def __init__(self, svm_c=0.1, fs=250, bands=None, riem_opt='Riemann', rho=0.1, filter_order=2,
-                 random_state=None, num_bits=8, bitshift_scale=False):
+                 random_state=None, num_bits=8, bitshift_scale=True):
         """ Constructor
 
         Parameters
@@ -288,3 +288,31 @@ class QuantizedRiemannianModel():
         """
         features = self.riemannian.features(samples)
         return self.classifier.predict(features)
+
+    def predict_with_intermediate(self, sample):
+        """ Predict some data
+
+        Parameters
+        ----------
+
+        samples: np.array, size=(C, T)
+                 training sample
+
+        Returns
+        -------
+
+        ordered dictionary including every intermediate result and the output
+        """
+        assert len(sample.shape) == 2
+        result = self.riemannian.onetrial_feature_with_intermediate(sample)
+        result["svm_result"] = self.classifier.predict(next(reversed(result.values())))
+        return result
+
+    def get_data_dict(self):
+        """ Returns a nested dictionary containing all necessary data """
+        return {"num_bits": self.num_bits,
+                "SVM": {"weights": self.classifier.coef_,
+                        "weight_scale": self.scale_weight,
+                        "bias": self.classifier.intercept_,
+                        "bias_scale": self.scale_bias},
+                "riemannian": self.riemannian.get_data_dict()}

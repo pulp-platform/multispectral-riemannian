@@ -73,6 +73,9 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_rese
     comp_shift: np.array, size=(M, 2)
                 Bitshift (to the right) to apply for computing, b_shift: (M, 0) and a_shift: (M, 1)
 
+    y_scale: float:
+             Scale factor of the output, same as the parameter
+
     y_shift: int:
              Bitshift (to the right) to apply after the last section, for converting back to the
              output scale
@@ -117,10 +120,10 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_rese
         quant_coeff[m, 3:] = quantize(coeff[m, 3:], a_scale, num_bits=n_bits, do_round=True)
         quant_coeff[m, :3] = quantize(coeff[m, :3], b_scale, num_bits=n_bits, do_round=True)
 
-    return quant_coeff, scale_coeff, comp_shift.astype(int), y_shift
+    return quant_coeff, scale_coeff, comp_shift.astype(int), y_scale, y_shift
 
 
-def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt", n_bits=8,
+def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
                    intermediate_bits=INTERMEDIATE_BITS, filter_bits=N_FILTER_BITS,
                    form=DEFAULT_FORM):
     """ applies sos filter in quantized form (Direct Form 1 or 2)
@@ -147,7 +150,7 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     data: np.array, size=N
           Input signal
 
-    quant_filter: tuple (quant_coeff, scale_coeff, comp_shift, scale_output):
+    quant_filter: tuple (quant_coeff, scale_coeff, comp_shift, output_scale, output_shift):
 
         quant_coeff: np.array, size=(M, 6)
                      filter coefficients, with M second order sections. The first three represent
@@ -160,14 +163,14 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
         comp_shift: np.array, size=(M, 2), dtype=int
                     amount to shift during computation, for all sections, numerator and denominators
 
+        output_scale: float
+                      Scale factor of the output data
+
         output_shift: int
                       amount to shift the output data (to the left)
 
     scale_data: float
                 Scale factor for the input data
-
-    scale_output: float
-                  Scale factor of the output data, must be a power of two
 
     mode: str { "valid", "same", "full", "sosfilt" }
           Mode for truncating the output. The mode "sosfilt" behaves the like scipy.signal.sosfilt
@@ -187,7 +190,7 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
     np.array, size=N': result
     """
 
-    coeff, scale_coeff, comp_shift, y_shift = quant_filter
+    coeff, scale_coeff, comp_shift, y_scale, y_shift = quant_filter
 
     # check data
     assert len(data.shape) == 1
@@ -245,7 +248,7 @@ def quant_sos_filt(data, quant_filter, scale_data, scale_output, mode="sosfilt",
         y = y << y_shift
 
     # dequantize to float
-    result = dequantize_to_float(y, scale_output, n_bits)
+    result = dequantize_to_float(y, y_scale, n_bits)
 
     return result
 
