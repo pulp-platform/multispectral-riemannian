@@ -20,6 +20,7 @@ BIT_RESERVE = 0
 INTERMEDIATE_BITS = 16
 DEFAULT_FORM = 1
 OVERFLOW_WARNING = True
+OVERFLOW_RAISE = False
 
 def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_reserve=BIT_RESERVE):
     """ Quantizes the sos filter coefficients and prepares the scale ranges.
@@ -288,6 +289,8 @@ def _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits):
                 if show_warning:
                     print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {m=}, {acc=}")
                     show_warning = False
+                if OVERFLOW_RAISE:
+                    raise RuntimeError("Overflow")
 
             regs[m, 0] = acc
 
@@ -331,6 +334,8 @@ def _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits):
                 if show_warning:
                     print(f"Warning: overflow in quant_sos_filt detected!: {k=}, {m=}, {acc=}")
                     show_warning = False
+                if OVERFLOW_RAISE:
+                    raise RuntimeError("Overflow")
 
             regs[m, 0] = acc
 
@@ -369,7 +374,13 @@ def _plot(band, coeff):
         plt.show()
 
 
-def _par_measure(w, t, coeff):
+def _par_measure(w, t, coeff, n_filter_bits=None, bit_reserve=None):
+
+    if n_filter_bits is None:
+        n_filter_bits = N_FILTER_BITS
+    if bit_reserve is None:
+        bit_reserve = BIT_RESERVE
+
     x = np.cos(w * t)
 
     y_exp_f = sosfilt(coeff, x)
@@ -378,9 +389,9 @@ def _par_measure(w, t, coeff):
     y_scale = np.abs(y_exp_f).max()
     y_scale = 2 ** np.ceil(np.log2(y_scale))
 
-    quant_filter = prepare_quant_filter(coeff, x_scale, y_scale)
+    quant_filter = prepare_quant_filter(coeff, x_scale, y_scale, n_filter_bits, bit_reserve)
 
-    y_acq = quant_sos_filt(x, quant_filter, x_scale, y_scale)
+    y_acq = quant_sos_filt(x, quant_filter, x_scale, y_scale, filter_bits=n_filter_bits)
     y_exp_q = sosfilt(quant_filter[0], x)
 
     a_acq = np.abs(y_acq[-100:]).max()
@@ -412,16 +423,96 @@ def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     ax.plot(freqs, ampl_exp_q, label="quantized weights")
     ax.plot(freqs, ampl_acq, label="fully quantized")
     ax.legend()
-    ax.set_yscale('log')
+    #ax.set_yscale('log')
     plt.show()
+
+
+def _find_best_params(filter_bank):
+    global OVERFLOW_RAISE
+    OVERFLOW_RAISE = True
+    global OVERFLOW_WARNING
+    OVERFLOW_WARNING = False
+
+    filter_bits_list = [8, 9, 10, 11, 12, 13, 14, 15, 16]
+    bit_reserve_list = [0]
+    frequency_list = np.linspace(0, np.pi / 2, 500)
+    t = np.array(range(1000))
+
+    n_runs = len(filter_bits_list) * len(bit_reserve_list)
+
+    scores = {}
+
+    best_score = np.inf
+
+    with tqdm(desc="Finding the best parameters", total=n_runs) as bar:
+        with Pool() as p:
+
+            # repeat for all parameters
+            for n_filter_bits in filter_bits_list:
+                for bit_reserve in bit_reserve_list:
+
+                    # accumulated error
+                    l2_error = 0
+                    l1_error = 0
+                    log_error = 0
+
+                    try:
+                        # repeat for all filters
+                        for coeff in filter_bank:
+
+                            # do the measurement for all frequencies
+                            measure_fun = partial(_par_measure, t=t, coeff=coeff,
+                                                    n_filter_bits=n_filter_bits,
+                                                    bit_reserve=bit_reserve)
+                            measurement = np.array(list(p.imap(measure_fun, frequency_list)))
+
+                            exp = measurement[:, 1]
+                            acq = measurement[:, 0]
+
+                            l2_error += ((exp - acq) ** 2).sum()
+                            l1_error += np.abs(exp - acq).sum()
+                            log_error += np.abs(np.log(exp[5:]) - np.log(acq[5:])).sum()
+                    except RuntimeError:
+                        bar.update()
+                        continue
+
+                    bar.update()
+
+                    # store the result
+                    scores[(n_filter_bits, bit_reserve)] = {"l1": l1_error, "l2": l2_error, "log": log_error}
+                    if l1_error < best_score:
+                        best_score_tuple = (n_filter_bits, bit_reserve)
+                        best_score = l1_error
+
+    print("\nSorted after L1 error")
+    for k, v in sorted(scores.items(), key=lambda t: t[1]["l1"]):
+        filter_bits, bit_reserve = k
+        l1 = v["l1"]
+        print(f"filter bits: {filter_bits:2d}, reserve: {bit_reserve}: {l1=:.3f}")
+
+    print("\nSorted after L2 error")
+    for k, v in sorted(scores.items(), key=lambda t: t[1]["l2"]):
+        filter_bits, bit_reserve = k
+        l2 = v["l2"]
+        print(f"filter bits: {filter_bits:2d}, reserve: {bit_reserve}: {l2=:.3f}")
+
+    print("\nSorted after log error")
+    for k, v in sorted(scores.items(), key=lambda t: t[1]["log"]):
+        filter_bits, bit_reserve = k
+        log = v["log"]
+        print(f"filter bits: {filter_bits:2d}, reserve: {bit_reserve}: {log=:.3f}")
+
+    best_filter_bits, best_bit_reserve = best_score_tuple
+    print(f"\nBest Score: {best_filter_bits=}, {best_bit_reserve=}, {scores[best_score_tuple]}")
 
 
 def _test():
     """ test function to run the frequency sweep on all filterbands """
     bands = load_bands([2], f_s=250)
     bank = load_filterbank([2], fs=250, order=2)
+    # _find_best_params(bank)
     for band, coeff in zip(bands, bank):
-        #_plot(band, coeff)
+        # _plot(band, coeff)
         _sweep(band, coeff)
 
 
