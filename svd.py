@@ -9,6 +9,7 @@ import unittest
 # with 1e-4, we get 1e-1 accuracy, requiring approx 360 iterations
 SVD_EPSILON = 1e-4 # 1e-15 # 2e-4
 _ACCURACY = 1e-1 # with epsilon:1e-4
+# MIN_ALLOWED_EIGENVALUE = 1e-3
 
 def logm(mat, epsilon=SVD_EPSILON):
     """ Computes the matrix logarithm of a real, symmetric matrix
@@ -23,7 +24,10 @@ def logm(mat, epsilon=SVD_EPSILON):
     -------
     np.array, size=(N, N): result
     """
+    # convert the matrix to float32
+    mat = np.float32(mat)
     L, D, R = svd(mat, epsilon=epsilon)
+    # D = np.clip(D, MIN_ALLOWED_EIGENVALUE, None)
     log_D = np.diag(np.log(np.diag(D)))
     return L @ log_D @ R
 
@@ -80,7 +84,7 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
     N = T.shape[0]
     main_diag = np.diag(T).copy()
     off_diag = np.diag(T, k=1).copy() # range 0..N-1, in reference, it is 1..N (also, they use 1-indexing)
-    Q = np.eye(N)
+    Q = np.eye(N).astype(np.float32)
     m = N-1
 
     if with_n_iter:
@@ -164,8 +168,8 @@ def _householder_tridiagonal(mat):
     assert mat.shape[1] == mat.shape[0]
     N = mat.shape[0]
     T = mat.copy()
-    L = np.eye(N)
-    R = np.eye(N)
+    L = np.eye(N).astype(np.float32)
+    R = np.eye(N).astype(np.float32)
     for k in range(N-2):
         s = np.linalg.norm(T[k+1:, k])
         if s == 0:
@@ -174,11 +178,11 @@ def _householder_tridiagonal(mat):
         sign = np.sign(val)
         z = (1 + sign * val / s) / 2
         sqrtz = np.sqrt(z)
-        v = np.zeros(N)
+        v = np.zeros(N).astype(np.float32)
         v[k+1] = sqrtz
         v[k+2:] = (sign * T[k, k+2:]) / (2 * s * sqrtz)
         v = v.reshape(-1, 1)
-        H = np.eye(N) - 2 * v @ v.T
+        H = np.eye(N).astype(np.float32) - 2 * v @ v.T
         T = H @ T @ H
         L = H @ L
         R = R @ H
