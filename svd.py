@@ -9,7 +9,7 @@ import unittest
 # with 1e-4, we get 1e-1 accuracy, requiring approx 360 iterations
 SVD_EPSILON = 1e-4 # 1e-15 # 2e-4
 _ACCURACY = 1e-1 # with epsilon:1e-4
-# MIN_ALLOWED_EIGENVALUE = 1e-3
+MIN_ALLOWED_EIGENVALUE = 1e-3
 
 def logm(mat, epsilon=SVD_EPSILON):
     """ Computes the matrix logarithm of a real, symmetric matrix
@@ -27,7 +27,7 @@ def logm(mat, epsilon=SVD_EPSILON):
     # convert the matrix to float32
     mat = np.float32(mat)
     L, D, R = svd(mat, epsilon=epsilon)
-    # D = np.clip(D, MIN_ALLOWED_EIGENVALUE, None)
+    D = np.clip(D, MIN_ALLOWED_EIGENVALUE, None)
     log_D = np.diag(np.log(np.diag(D)))
     return L @ log_D @ R
 

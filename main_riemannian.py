@@ -5,7 +5,10 @@ Model for Riemannian feature calculation and classification for EEG data
 '''
 
 import time
+import os
+import pickle
 import numpy as np
+import argparse
 
 from sklearn.model_selection import KFold
 
@@ -77,6 +80,47 @@ def main():
     print("Average success rate: " + str(success_tot_sum / NO_SUBJECTS))
     print("Time elapsed [s] " + str(end - start))
 
+def main_export(subject, sample_idx, foldername):
+    """ train the model for one pecific subject and generate pickled files """
+    # we must use the quantized model
+    model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT)
+
+    train_samples, train_labels = get_data(subject, True, DATA_PATH)
+    test_samples, test_labels = get_data(subject, False, DATA_PATH)
+
+    # fit the data
+    model.fit(train_samples, train_labels)
+
+    # predict the requested sample
+    test_sample = test_samples[sample_idx]
+    test_label = test_labels[sample_idx]
+
+    history = model.predict_with_intermediate(test_sample)
+    history["expected_label"] = test_label
+
+    # store everything to a file
+    with open(os.path.join(foldername, "model.pkl"), "wb") as _f:
+        pickle.dump(model.get_data_dict(), _f)
+
+    # store the history
+    with open(os.path.join(foldername, "verification.pkl"), "wb") as _f:
+        pickle.dump(history, _f)
+
+    # store the input only
+    with open(os.path.join(foldername, "input.pkl"), "wb") as _f:
+        pickle.dump(history["input"], _f)
+
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--export", action="store_true", help="Export the model and data")
+    parser.add_argument("-s", "--subject", type=int, default=1, help="Subject to store")
+    parser.add_argument("-i", "--sample_idx", type=int, default=0, help="Sample idx to store")
+    parser.add_argument("-f", "--folder", type=str, default="export", help="Foldername to export")
+
+    args = parser.parse_args()
+
+    if (args.export):
+        main_export(args.subject, args.sample_idx, args.folder)
+    else:
+        main()
