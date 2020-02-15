@@ -61,6 +61,9 @@ def svd(mat, epsilon=SVD_EPSILON, with_n_iter=False):
     return L, D, R
 
 
+QR_MAX_N_REPEAT = 100
+
+
 def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
     """ Computes the Eigenvalues and Eigenvectors of a real, symmetric, tridiagonal matrix.
 
@@ -81,22 +84,59 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
     np.array, size=(N, N): eigenvectors
     """
 
-    N = T.shape[0]
     main_diag = np.diag(T).copy()
     off_diag = np.diag(T, k=1).copy() # range 0..N-1, in reference, it is 1..N (also, they use 1-indexing)
+
+    return _qr_symm_tridiag_work(main_diag, off_diag, epsilon=epsilon, with_n_iter=with_n_iter)
+
+
+def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=False):
+    """ Work funciton, which might call itself recursively to solve defaltion """
+    N = main_diag.shape[0]
+    assert len(off_diag) == N - 1
     Q = np.eye(N).astype(np.float32)
     m = N-1
+    n_repeat = QR_MAX_N_REPEAT
+
+    # numerical precisisons
+    eps = np.finfo(np.float32).eps
+    eps_sqr = eps ** np.float32(2)
+    abs_min = np.finfo(np.float32).tiny
+    safe_min = np.sqrt(abs_min) / eps_sqr
+    safe_max = np.sqrt(np.float32(1) / abs_min) / np.float32(3)
+
+    # check recursive break
+    if N == 1:
+        if with_n_iter:
+            return N, np.eye(1).astype(np.float32), 0
+        return N, np.eye(1).astype(np.float32)
 
     if with_n_iter:
         n_iter = 0
 
     while m > 0:
+
+        # check if the matrix which is left to be transformed has zero offdiagonal elements
+        for k in range(m-1):
+            if np.abs(off_diag[k]) < eps:
+                # the off-diag element k is very small! divide the matrix
+                main_diag[:k+1], Q1, n_iter1 = _qr_symm_tridiag_work(main_diag[:k+1], off_diag[:k], epsilon=epsilon, with_n_iter=True)
+                main_diag[k+1:m+1], Q2, n_iter2 = _qr_symm_tridiag_work(main_diag[k+1:m+1], off_diag[k+1:m], epsilon=epsilon, with_n_iter=True)
+                # reproduce the Q
+                Q_construct = np.eye(N).astype(np.float32)
+                Q_construct[:k+1, :k+1] = Q1
+                Q_construct[k+1:m+1, k+1:m+1] = Q2
+                Q = Q @ Q_construct
+                if with_n_iter:
+                    return main_diag, Q, n_iter + max(n_iter1, n_iter2)
+                return main_diag, Q
+
         # do wilkinson shift
-        d = (main_diag[m-1] - main_diag[m]) / 2
+        d = (main_diag[m-1] - main_diag[m]) / np.float32(2)
         if d == 0:
             shift = main_diag[m] - np.abs(off_diag[m-1])
         else:
-            shift = main_diag[m] - ((off_diag[m-1] ** 2) / (d + np.sign(d) * np.sqrt(d ** 2 + off_diag[m-1] ** 2)))
+            shift = main_diag[m] - ((off_diag[m-1] ** np.float32(2)) / (d + np.sign(d) * np.sqrt(d ** np.float32(2) + off_diag[m-1] ** np.float32(2))))
 
         # start the implicit QR step
         x = main_diag[0] - shift
@@ -107,12 +147,12 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
                 c, s = _givens(x, y)
             else:
                 # diagonalize the remaining elements, only done once
-                c, s = _givens_diag(main_diag[0], main_diag[1], off_diag[0])
+                c, s = _givens_diag(main_diag[0], off_diag[0], main_diag[1])
 
             # compute some values
             w = c * x - s * y
             d = main_diag[k] - main_diag[k + 1]
-            z = (2 * c * off_diag[k] + d * s) * s
+            z = (np.float32(2) * c * off_diag[k] + d * s) * s
 
             # do the step on the main and off diagonal
             main_diag[k] = main_diag[k] - z
@@ -136,10 +176,20 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
         # check for convergence
         if np.abs(off_diag[m - 1]) < epsilon * (np.abs(main_diag[m - 1]) + np.abs(main_diag[m])):
             m = m - 1
+            n_repeat = QR_MAX_N_REPEAT
+        else:
+            n_repeat -= 1
+            if n_repeat == 0:
+                np.set_printoptions(precision=1, linewidth=200)
+                print(f"{m=}")
+                print(f"{main_diag=}")
+                print(f"{off_diag=}")
+                raise RuntimeError("Maximum Iterations Reached")
 
     if with_n_iter:
         return main_diag, Q, n_iter
     return main_diag, Q
+
 
 
 def _householder_tridiagonal(mat):
@@ -176,18 +226,21 @@ def _householder_tridiagonal(mat):
             continue
         val = T[k+1, k]
         sign = np.sign(val)
-        z = (1 + sign * val / s) / 2
+        z = (np.float32(1) + sign * val / s) / np.float32(2)
         sqrtz = np.sqrt(z)
         v = np.zeros(N).astype(np.float32)
         v[k+1] = sqrtz
-        v[k+2:] = (sign * T[k, k+2:]) / (2 * s * sqrtz)
+        v[k+2:] = (sign * T[k, k+2:]) / (np.float32(2) * s * sqrtz)
         v = v.reshape(-1, 1)
-        H = np.eye(N).astype(np.float32) - 2 * v @ v.T
+        H = np.eye(N).astype(np.float32) - np.float32(2) * v @ v.T
         T = H @ T @ H
         L = H @ L
         R = R @ H
 
     return L.T, T, R.T
+
+
+GIVENS_SAVE_MINIMUM = 1e-10
 
 
 def _givens(a, b):
@@ -210,30 +263,38 @@ def _givens(a, b):
     float: s = sin(theta)
     """
     if b == 0:
-        c = 1
-        s = 0
+        c = np.float32(1)
+        s = np.float32(0)
+    elif a == 0:
+        c = np.float32(0)
+        s = np.sign(b)
     else:
-        r = np.sqrt(a ** 2 + b ** 2)
-        inv_r = 1/r
+        # scale a and b to avoid underflow / overflow
+        scale = max(abs(a), abs(b))
+        if scale < GIVENS_SAVE_MINIMUM:
+            a = a / scale
+            b = b / scale
+        r = np.sqrt(a ** np.float32(2) + b ** np.float32(2))
+        inv_r = np.float32(1)/r
         c = a * inv_r
         s = -b * inv_r
     return c, s
 
 
-def _givens_diag(a1, a2, b):
+def _givens_diag(a, b, c):
     """ Computes the parameters for the givens rotation.
 
     The values c = cos(theta), s = sin(theta) are computed, such that:
 
-    | c -s |^T | a1 b  | | c -s |   | p  0 |
-    | s  c |   | b  a2 | | s  c | = | 0  q |
+    | c -s |^T | a  b | | c -s |   | p  0 |
+    | s  c |   | b  c | | s  c | = | 0  q |
 
     Parameters
     ----------
 
-    a1: float
-    a2: float
+    a: float
     b: float: off-diagonal
+    c: float
 
     Returns
     -------
@@ -242,8 +303,8 @@ def _givens_diag(a1, a2, b):
     """
     if b == 0:
         return 1, 0
-    double_angle_tan = (2 * b) / (a1 - a2)
-    angle = np.arctan(double_angle_tan) / 2
+    double_angle_tan = (np.float32(2) * b) / (a - c)
+    angle = np.arctan(double_angle_tan) / np.float32(2)
     return np.cos(angle), -np.sin(angle)
 
 
@@ -287,7 +348,7 @@ class TestSVD(unittest.TestCase):
             a1 = np.random.randn(1)[0] * 5
             a2 = np.random.randn(1)[0] * 5
             b = np.random.randn(1)[0] * 4
-            c, s = _givens_diag(a1, a2, b)
+            c, s = _givens_diag(a1, b, a2)
             rot = np.array([[c, -s], [s, c]])
             A = np.array([[a1, b], [b, a2]])
             assert _is_diag(rot @ A @ rot.T)
@@ -332,7 +393,7 @@ class TestSVD(unittest.TestCase):
 def _determine_epsilon_for_accuracy(accuracy=1e-4):
     current_eps = accuracy
     success = False
-    n_trials = 200
+    n_trials = 20
 
     while not success:
         success = True
@@ -341,6 +402,7 @@ def _determine_epsilon_for_accuracy(accuracy=1e-4):
             for _ in range(n_trials):
                 X = np.random.randn(22, 825)
                 A = X @ X.T
+                A = A.astype(np.float32)
                 L, D, R, n_iter = svd(A, epsilon=current_eps, with_n_iter=True)
                 mean_n_iter += n_iter / n_trials
                 exp_eigvals = np.sort(np.linalg.eigvals(A))
@@ -350,13 +412,13 @@ def _determine_epsilon_for_accuracy(accuracy=1e-4):
         except AssertionError:
             success = False
             current_eps = current_eps * 0.1
-            if current_eps < 1e-15:
+            if current_eps < 1e-30:
                 raise RuntimeError("Max number of iterations reached")
     return current_eps, mean_n_iter
 
 
 def _epsilon_sweep():
-    for accuracy in [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]:
+    for accuracy in [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]:
         required_eps, n_iter = _determine_epsilon_for_accuracy(accuracy)
         print(f"For accuracy: {accuracy:.0E}, required epsilon: {required_eps:.0E}, n_iter: {n_iter:.1f}")
 
