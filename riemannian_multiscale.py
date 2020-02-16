@@ -19,10 +19,6 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 FIXPOINT_IIR_IMPLEMENTATION = False
 
-REF_NUM_BITS = 10
-COV_NUM_BITS = 16
-WHITE_COMP_BITS = 5 # = ceil(log2(22))
-
 
 class RiemannianMultiscale:
     """ Riemannian feature multiscale class
@@ -306,20 +302,15 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
     """
     def __init__(self, filter_bank, temp_windows, riem_opt="Riemann", rho=0.1, vectorized=True,
-                 num_bits=8, bitshift_scale=True, quantize_cov_whitening=True):
+                 num_bits=8, bitshift_scale=True):
 
         super(QuantizedRiemannianMultiscale, self).__init__(filter_bank, temp_windows, riem_opt=riem_opt,
                                                             rho=rho, vectorized=vectorized)
         self.num_bits = num_bits
         self.bitshift_scale = bitshift_scale
-        self.quantize_cov_whitening = quantize_cov_whitening
 
         self.scale_input = 0
         self.scale_filter_out = np.zeros((self.n_freq, ))
-        if self.quantize_cov_whitening:
-            self.scale_cov = np.zeros((self.n_freq, )) # Determined from scale_filter_out
-            self.scale_ref = np.zeros((self.n_freq, )) # determined from scale_filter_out
-            self.scale_logm_in = np.zeros((self.n_freq, )) # determined from scale_filter_out and scale_ref
         self.scale_logm_out = 0
         self.scale_features = 0
         self.quant_filter_bank = []
@@ -378,13 +369,15 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         result["cov_mat"] = x_cov
 
         # quantize covariance matrix
+        """
         x_cov = np.array([self._quantize(x_cov[freq_idx], self.scale_cov[freq_idx],
                                          num_bits=COV_NUM_BITS, do_round=True)
                           for freq_idx in self.n_freq])
         result["cov_mat_quant"] = x_cov
+        """
 
         # scale covariance matrix and add offset
-        x_cov_reg = np.array([(X +  np.eye(C) * self.rho) for X in x_cov])
+        x_cov_reg = np.array([(X + np.eye(C) * self.rho) for X in x_cov])
         result["cov_mat_reg"] = x_cov_reg
 
         # transform the covariance matrix with the mean covariance matrix
@@ -435,26 +428,9 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                 k = int(np.ceil(np.log2(self.scale_filter_out[band] / self.scale_input)))
                 self.scale_filter_out[band] = self.scale_input * (2 ** k)
 
-                if self.quantize_cov_whitening:
-                    # make sure that scale_cov is a multiple of two to the filter output
-                    k = int(np.ceil(np.log2(self.scale_cov[band] / self.scale_filter_out[band])))
-                    self.scale_cov[band] = self.scale_filter_out[band] * (2 ** k)
-
             # make last transformation a power of two
             k = int(np.ceil(np.log2(self.scale_features / self.scale_logm_out)))
             self.scale_features = self.scale_logm_out * (2 ** k)
-
-        if self.quantize_cov_whitening:
-            # determine scale ranges for the remaining elements
-            for band in range(self.filter_bank.shape[0]):
-                self.scale_ref[band] = np.abs(self.c_ref_invsqrtm[band]).max()
-                self.scale_logm_in[band] = (self.scale_ref[band] ** 2) * (self.scale_cov[band])
-                self.scale_logm_in[band] *= 2 ** (34 - COV_NUM_BITS - 2 * REF_NUM_BITS)
-
-                # quantize the reference matrix
-                self.c_ref_invsqrtm[band] = self._quantize(self.c_ref_invsqrtm[band],
-                                                           self.scale_ref[band],
-                                                           num_bits=REF_NUM_BITS, do_round=True)
 
         # prepare the filter quantization
         for band in range(self.filter_bank.shape[0]):
@@ -525,20 +501,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
     def log_whitened_kernel(self, mat, c_ref_invsqrtm, freq_idx):
 
-        if self.quantize_cov_whitening:
-            # quantize the covariance matix, no monitoring necessary
-            if self.monitor_ranges:
-                self.scale_cov[freq_idx] = max(self.scale_cov[freq_idx], np.abs(mat).max())
-            else:
-                mat = self._quantize(mat, self.scale_cov[freq_idx], num_bits=COV_NUM_BITS, do_round=True)
-
         tmp = np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)
-
-        if self.quantize_cov_whitening:
-            # the following quantization should should (in theory) not be necessary
-            if not self.monitor_ranges:
-                if np.abs(tmp).max() > self.scale_logm_in[freq_idx]:
-                    raise OverflowError()
 
         # mat_log = base.logm(tmp)
         mat_log = logm(tmp)
