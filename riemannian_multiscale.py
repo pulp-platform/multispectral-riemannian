@@ -378,12 +378,10 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         result["cov_mat"] = x_cov
 
         # quantize covariance matrix
-        """
-        x_cov = np.array([self._quantize(x_cov[freq_idx], self.scale_cov[freq_idx],
-                                         num_bits=COV_NUM_BITS, do_round=True)
-                          for freq_idx in self.n_freq])
+        x_cov = np.array([self._quantize(x_cov[freq_idx], self.scale_cov_mat[freq_idx],
+                                         num_bits=COV_MAT_BITS, do_round=True)
+                          for freq_idx in range(self.n_freq)])
         result["cov_mat_quant"] = x_cov
-        """
 
         # scale covariance matrix and add offset
         x_cov_reg = np.array([(X + np.eye(C) * self.rho) for X in x_cov])
@@ -392,12 +390,6 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         # transform the covariance matrix with the mean covariance matrix
         x_cov_transform = np.array([C @ X @ C for X, C in zip(x_cov_reg, self.c_ref_invsqrtm)])
         result["cov_mat_transform"] = x_cov_transform
-
-        # quantize the transformed covariance matrix, but this should not change any value!
-        x_cov_transform = np.array([self._quantize(x_cov_transform[freq_idx],
-                                                   self.scale_logm_in[freq_idx], num_bits=32,
-                                                   do_round=True)
-                                    for freq_idx in self.n_freq])
 
         # apply logm
         x_cov_logm = np.array([logm(X) for X in x_cov_transform])
@@ -575,9 +567,10 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                                  "y_shift": y_shift}
                                 for coeff, scale, shift, y_scale, y_shift in self.quant_filter_bank],
                 "filter_out_scale": self.scale_filter_out,
-                "cov_mat_scale": self.scale_cov,
+                "cov_mat_scale": self.scale_cov_mat,
                 "cov_mat_rho": self.rho,
-                "logm_in_scale": self.scale_logm_in,
                 "c_ref_invsqrtm": self.c_ref_invsqrtm,
+                "c_ref_invsqrtm_scale": self.scale_ref_invsqrtm,
                 "logm_out_scale": self.scale_logm_out,
-                "features_scale": self.scale_features}
+                "features_scale": self.scale_features,
+                "bitshift_scale": self.bitshift_scale}

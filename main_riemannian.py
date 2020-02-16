@@ -98,6 +98,10 @@ def main_export(subject, sample_idx, foldername):
     history = model.predict_with_intermediate(test_sample)
     history["expected_label"] = test_label
 
+    # generate the folder if it does not yet exist
+    if not os.path.exists(foldername):
+        os.makedirs(foldername)
+
     # store everything to a file
     with open(os.path.join(foldername, "model.pkl"), "wb") as _f:
         pickle.dump(model.get_data_dict(), _f)

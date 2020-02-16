@@ -303,9 +303,12 @@ class QuantizedRiemannianModel():
 
         ordered dictionary including every intermediate result and the output
         """
+        print("Predict sample with intermediate matrices")
         assert len(sample.shape) == 2
         result = self.riemannian.onetrial_feature_with_intermediate(sample)
-        result["svm_result"] = self.classifier.predict(next(reversed(result.values())))
+        features = next(reversed(result.values()))
+        features = features.reshape(1, -1)
+        result["svm_result"] = self.classifier.predict(features)
         return result
 
     def get_data_dict(self):
