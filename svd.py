@@ -108,8 +108,23 @@ def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=
     # check recursive break
     if N == 1:
         if with_n_iter:
-            return N, np.eye(1).astype(np.float32), 0
-        return N, np.eye(1).astype(np.float32)
+            return main_diag, np.eye(1).astype(np.float32), 0
+        return main_diag, np.eye(1).astype(np.float32)
+
+    if N == 2:
+        # diagonalize this matrix quickly
+        # the formula for calculating the two eigenvalues, with main_diag[k] = ak and offdiag[0] = b
+        # lambda1 = a1*c^2 - 2 b*c*s + a2 * s^2
+        # lambda2 = a1*s^2 + 2 b*c*s + a2 * c^2
+        c, s = _givens_diag(main_diag[0], off_diag[0], main_diag[1])
+        c_square = c * c
+        s_square = s * s
+        bcs2 = off_diag[0] * c * s * np.float32(2)
+        lambda1 = main_diag[0] * c_square - bcs2 + main_diag[1] * s_square
+        lambda2 = main_diag[0] * s_square + bcs2 + main_diag[1] * c_square
+        if with_n_iter:
+            return np.array([lambda1, lambda2]), np.array([[c, -s], [s, c]]), 1
+        return np.array([lambda1, lambda2]), np.array([[c, -s], [s, c]])
 
     if with_n_iter:
         n_iter = 0
@@ -128,7 +143,7 @@ def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=
                 Q_construct[k+1:m+1, k+1:m+1] = Q2
                 Q = Q @ Q_construct
                 if with_n_iter:
-                    return main_diag, Q, n_iter + max(n_iter1, n_iter2)
+                    return main_diag, Q, n_iter + n_iter1 + n_iter2
                 return main_diag, Q
 
         # do wilkinson shift
@@ -180,7 +195,7 @@ def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=
         else:
             n_repeat -= 1
             if n_repeat == 0:
-                np.set_printoptions(precision=1, linewidth=200)
+                np.set_printoptions(linewidth=200)
                 print(f"{m=}")
                 print(f"{main_diag=}")
                 print(f"{off_diag=}")
