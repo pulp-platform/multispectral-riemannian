@@ -19,6 +19,8 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 FIXPOINT_IIR_IMPLEMENTATION = False
 
+REF_INVSQRTM_BITS = 8
+
 
 class RiemannianMultiscale:
     """ Riemannian feature multiscale class
@@ -302,18 +304,22 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
     """
     def __init__(self, filter_bank, temp_windows, riem_opt="Riemann", rho=0.1, vectorized=True,
-                 num_bits=8, bitshift_scale=True):
+                 num_bits=8, bitshift_scale=True, quant_whitening=True):
 
-        super(QuantizedRiemannianMultiscale, self).__init__(filter_bank, temp_windows, riem_opt=riem_opt,
-                                                            rho=rho, vectorized=vectorized)
+        super(QuantizedRiemannianMultiscale, self).__init__(filter_bank, temp_windows,
+                                                            riem_opt=riem_opt, rho=rho,
+                                                            vectorized=vectorized)
         self.num_bits = num_bits
         self.bitshift_scale = bitshift_scale
+        self.quant_whitening = quant_whitening
 
         self.scale_input = 0
         self.scale_filter_out = np.zeros((self.n_freq, ))
         self.scale_logm_out = 0
         self.scale_features = 0
         self.quant_filter_bank = []
+        if self.quant_whitening:
+            self.scale_ref_invsqrtm = np.zeros((self.n_freq, ))
 
         # filters must be second order sections
         assert self.filter_bank.shape[2] == 6
@@ -437,6 +443,16 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
             self.quant_filter_bank.append(prepare_quant_filter(self.filter_bank[band],
                                                                self.scale_input,
                                                                self.scale_filter_out[band]))
+
+        # Quantize Covariance Whitening
+        if self.quant_whitening:
+            for band in range(self.n_freq):
+                # quantize ref_invsqrtm
+                self.scale_ref_invsqrtm[band] = np.abs(self.c_ref_invsqrtm).max()
+                self.scale_ref_invsqrtm[band] = 2 ** np.ceil(np.log2(self.scale_ref_invsqrtm[band]))
+                self.c_ref_invsqrtm[band] = quantize(self.c_ref_invsqrtm[band],
+                                                     self.scale_ref_invsqrtm[band],
+                                                     num_bits=REF_INVSQRTM_BITS, do_round=True)
 
         # set the flag to monitor the range to false, the modul can now be used
         self.use_par = old_use_par
