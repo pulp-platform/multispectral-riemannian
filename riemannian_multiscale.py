@@ -10,16 +10,18 @@ from multiprocessing import Pool
 from functools import partial
 
 from filters import butter_fir_filter
-from utils import quantize
+from utils import quantize, quantize_to_int
 from svd import logm
 from sos_filt import quant_sos_filt, prepare_quant_filter
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
-FIXPOINT_IIR_IMPLEMENTATION = False
+FIXPOINT_IIR_IMPLEMENTATION = True
+COMPUTE_IN_PARALLEL = True
 
-REF_INVSQRTM_BITS = 8
+REF_INVSQRTM_BITS = 12
+COV_MAT_BITS = 16
 
 
 class RiemannianMultiscale:
@@ -71,7 +73,7 @@ class RiemannianMultiscale:
         elif riem_opt in ['Riemann_Euclid', 'Whitened_Euclid']:
             self.mean_metric = 'euclid'
         self.riem_opt = riem_opt
-        self.use_par = True
+        self.use_par = COMPUTE_IN_PARALLEL
 
         # regularization
         self.rho = rho
@@ -320,6 +322,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         self.quant_filter_bank = []
         if self.quant_whitening:
             self.scale_ref_invsqrtm = np.zeros((self.n_freq, ))
+            self.scale_cov_mat = np.zeros((self.n_freq, ))
 
         # filters must be second order sections
         assert self.filter_bank.shape[2] == 6
@@ -449,10 +452,16 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
             for band in range(self.n_freq):
                 # quantize ref_invsqrtm
                 self.scale_ref_invsqrtm[band] = np.abs(self.c_ref_invsqrtm).max()
-                self.scale_ref_invsqrtm[band] = 2 ** np.ceil(np.log2(self.scale_ref_invsqrtm[band]))
+                if self.bitshift_scale:
+                    self.scale_ref_invsqrtm[band] = 2 ** np.ceil(np.log2(self.scale_ref_invsqrtm[band]))
                 self.c_ref_invsqrtm[band] = quantize(self.c_ref_invsqrtm[band],
                                                      self.scale_ref_invsqrtm[band],
                                                      num_bits=REF_INVSQRTM_BITS, do_round=True)
+
+                # if bitshift scale is enabled, update the scaling for the covariance matrix
+                if self.bitshift_scale:
+                    k = int(np.ceil(np.log2(self.scale_cov_mat[band] / self.scale_filter_out[band])))
+                    self.scale_cov_mat[band] = self.scale_filter_out[band] * (2 ** k)
 
         # set the flag to monitor the range to false, the modul can now be used
         self.use_par = old_use_par
@@ -497,14 +506,16 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
     def _reg_cov_mat(self, data, freq_idx):
         """ Compute the regularized covariance matrix """
-        n_samples = data.shape[1]
+        # n_samples = data.shape[1]
         n_channel = data.shape[0]
 
         mul_result = np.dot(data, np.transpose(data))
 
         # cov_mat = 1/(n_samples-1) * mul_result + self.rho/n_samples*np.eye(n_channel)
-        cov_mat = mul_result + self.rho*np.eye(n_channel)
+        cov_mat = mul_result + self.rho * np.eye(n_channel)
 
+        # do not quantize the covariance matrix here, because we should compute the
+        # reference matrix in full precision
         return cov_mat
 
     def _output_quant(self, data):
@@ -516,11 +527,33 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         return data
 
     def log_whitened_kernel(self, mat, c_ref_invsqrtm, freq_idx):
+        if self.quant_whitening:
+            # quantize the covariance matrix here
+            if self.monitor_ranges:
+                self.scale_cov_mat[freq_idx] = max(self.scale_cov_mat[freq_idx], np.abs(mat).max())
+            else:
+                mat = quantize(mat, self.scale_cov_mat[freq_idx], num_bits=COV_MAT_BITS, do_round=True)
+
+                # check for overflow
+                mat_quant = quantize_to_int(mat, self.scale_cov_mat[freq_idx],
+                                            num_bits=COV_MAT_BITS, do_round=True)
+                ref_quant = quantize_to_int(c_ref_invsqrtm, self.scale_ref_invsqrtm[freq_idx],
+                                            num_bits=REF_INVSQRTM_BITS, do_round=True)
+                res_quant = ref_quant @ mat_quant @ ref_quant
+                if res_quant.min() < -(1 << 31):
+                    raise OverflowError("Negative Overflow")
+                if res_quant.min() > (1 << 31) - 1:
+                    raise OverflowError("Positive Overflow")
+                # determine unused bits
+                # used_bits = int(np.ceil(np.log2(np.abs(res_quant).max())))
+                # print(f"Unused bits: {31 - used_bits}")
 
         tmp = np.dot(np.dot(c_ref_invsqrtm, mat), c_ref_invsqrtm)
 
-        # mat_log = base.logm(tmp)
-        mat_log = logm(tmp)
+        if self.monitor_ranges:
+            mat_log = base.logm(tmp)
+        else:
+            mat_log = logm(tmp)
 
         # quantize output
         if self.monitor_ranges:
