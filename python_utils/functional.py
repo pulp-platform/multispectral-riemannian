@@ -85,17 +85,17 @@ def dequantize(x, scale_factor, n_bits=8):
     return x
 
 
-def quantize_iir_filter(filter_tuple, n_bits):
+def quantize_iir_filter(filter_dict, n_bits):
     """
     Quantize the iir filter tuple for sos_filt funcitons
 
     Parameters:
-    - filter_tuple: tuple, contains the quantized filter tuple:
-      - quant_coeff: np.array(size=(M, 6)), float representation of the coefficients
-      - scale_coeff: np.array(size=(M, 2)), scale all coefficients, not used here
-      - comp_shift: np.array(size=(M, 2), dtype=int), amount to shift during computation
-      - output_scale: float, scale factor of the output, unused here
-      - output_shift: int, number of bits to shift the output for scaling
+    - filter_dict: dict, contains the quantized filter dictionary with the following keys:
+      - coeff: np.array(size=(M, 6)), float representation of the coefficients
+      - coeff_scale: np.array(size=(M, 2)), scale all coefficients, not used here
+      - coeff_shift: np.array(size=(M, 2), dtype=int), amount to shift during computation
+      - y_scale: float, scale factor of the output, unused here
+      - y_shift: int, number of bits to shift the output for scaling
     - n_bits: int, number of bits to represent the filter coefficients
 
     Returns: tuple:
@@ -106,10 +106,15 @@ def quantize_iir_filter(filter_tuple, n_bits):
     - y_shift: int, amount to shift the output
     """
 
-    quant_coeff, scale_coeff, comp_shift, _, output_shift = filter_tuple
+    quant_coeff = filter_dict["coeff"]
+    scale_coeff = filter_dict["coeff_scale"]
+    comp_shift = filter_dict["coeff_shift"]
+    output_shift = filter_dict["y_shift"]
 
     M = quant_coeff.shape[0]
-    assert quant_coeff.shape[1] == 6
+    assert quant_coeff.shape == (M, 6)
+    assert scale_coeff.shape == (M, 2)
+    assert comp_shift.shape == (M, 2)
     assert comp_shift.dtype == int
     assert np.all(comp_shift <= 0)
 
@@ -160,7 +165,7 @@ def prepare_bitshift(a_scale, a_n_bits, b_scale, b_n_bits, y_scale, y_n_bits):
     factor = (a_range * b_range * y_scale) / (a_scale * b_scale * y_range)
 
     # the factor must be really close to a power of two
-    assert abs(int(np.log2(factor)) - np.log2(factor)) < 1e-9
+    np.testing.assert_almost_equal(np.log2(factor), round(np.log2(factor)))
 
     bitshift = int(np.round(np.log2(factor)))
     return bitshift

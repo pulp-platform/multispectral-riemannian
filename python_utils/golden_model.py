@@ -70,9 +70,10 @@ class GoldenModel:
         ''' quantizes the input and uses the correct time window '''
         assert x.dtype in [np.float32, np.float64]
 
-        # use the correct time window
-        t_start, t_end = self.temp_window
-        x = x[:, t_start:t_end]
+        if x.shape != self.input_shape:
+            # use the correct time window
+            t_start, t_end = self.temp_window
+            x = x[:, t_start:t_end]
 
         # quantize the input
         x = quantize_to_int(x, self.input_scale, self.input_n_bits)
@@ -243,7 +244,18 @@ class Filter(Block):
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
-        y = np.array([quant_sos_filt_df1(channel, self.coeff_a, self.coeff_b) for channel in x])
+        y = np.array([quant_sos_filt_df1(channel, self.coeff_a, self.coeff_b,
+                                         self.shift_a, self.shift_b)
+                      for channel in x])
+
+        # shift y back
+        if self.shift_y < 0:
+            y = y >> -self.shift_y
+        elif self.shift_y > 0:
+            y = y << self.shift_y
+
+        # throw away the last bits of the computation
+        y = y[:, :x.shape[1]]
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int
@@ -265,19 +277,18 @@ class CovMat(Block):
         self.rho = quantize_to_int(self.rho, self.output_scale, self.output_n_bits)
 
         # compute bitshift scale
-        input_n_bits = model_dict['n_bits']
-        self.bitshift_scale = prepare_bitshift(self.input_scale, input_n_bits,
-                                               self.input_scale, input_n_bits,
+        self.bitshift_scale = prepare_bitshift(self.input_scale, self.input_n_bits,
+                                               self.input_scale, self.input_n_bits,
                                                self.output_scale, self.output_n_bits)
 
     def apply(self, x):
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
-        y = x @ x
+        y = x @ x.T
         y = apply_bitshift_scale(y, self.bitshift_scale, True)
 
-        y = y + np.eye(self.C) * self.rho
+        y = y + np.eye(self.C).astype(int) * self.rho
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int
@@ -301,7 +312,6 @@ class Whitening(Block):
         self.output_scale = solve_for_scale_sqr(self.input_scale, self.input_n_bits,
                                                 self.ref_invsqrtm_scale, self.ref_invsqrtm_n_bits,
                                                 self.output_n_bits)
-
         # quantize ref_invsqrtm to integer
         self.ref_invsqrtm = quantize_to_int(model_dict['riemannian']['c_ref_invsqrtm'][freq_idx],
                                             self.ref_invsqrtm_scale, self.ref_invsqrtm_n_bits)
@@ -344,9 +354,9 @@ class Logm(Block):
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
-        x_float = dequantize(self.input_scale, self.input_n_bits)
+        x_float = dequantize(x, self.input_scale, self.input_n_bits)
         y_float = logm(x_float)
-        y = quantize_to_int(y_float, self.output_n_bits, self.output_scale)
+        y = quantize_to_int(y_float, self.output_scale, self.output_n_bits)
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int
