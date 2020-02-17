@@ -409,6 +409,7 @@ def _determine_epsilon_for_accuracy(accuracy=1e-4):
     current_eps = accuracy
     success = False
     n_trials = 20
+    quantization_levels = 2**16
 
     while not success:
         success = True
@@ -417,6 +418,9 @@ def _determine_epsilon_for_accuracy(accuracy=1e-4):
             for _ in range(n_trials):
                 X = np.random.randn(22, 825)
                 A = X @ X.T
+                max_A = np.abs(A).max()
+                A = np.round((A / max_A) * (quantization_levels))
+                A = A / quantization_levels * max_A
                 A = A.astype(np.float32)
                 L, D, R, n_iter = svd(A, epsilon=current_eps, with_n_iter=True)
                 mean_n_iter += n_iter / n_trials
