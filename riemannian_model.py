@@ -322,5 +322,5 @@ class QuantizedRiemannianModel():
                 "bitshift_scale": self.bitshift_scale,
                 "SVM": {"weights": self.classifier.coef_,
                         "weight_scale": self.scale_weight,
-                        "bias": self.classifier.intercept_,
+                        "bias": self.classifier.intercept_},
                 "riemannian": self.riemannian.get_data_dict()}

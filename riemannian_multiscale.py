@@ -452,8 +452,13 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
                 # if bitshift scale is enabled, update the scaling for the covariance matrix
                 if self.bitshift_scale:
-                    k = int(np.ceil(np.log2(self.scale_cov_mat[band] / self.scale_filter_out[band])))
-                    self.scale_cov_mat[band] = self.scale_filter_out[band] * (2 ** k)
+                    # Formula for rescale factor: (Rx * Rx * Sy) / (Sx * Sx * Ry)
+                    # The ranges are already powers of two.
+                    # Thus, Sy / Sx^2 must be a power of two. Since Sx is fixed, Sy must be changed.
+                    # Sy = Sx^2 * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx^2))
+                    k = (np.log2(self.scale_cov_mat[band] / (self.scale_filter_out[band] ** 2)))
+                    k = int(np.ceil(k))
+                    self.scale_cov_mat[band] = (self.scale_filter_out[band] ** 2) * (2 ** k)
 
         # set the flag to monitor the range to false, the modul can now be used
         self.use_par = old_use_par

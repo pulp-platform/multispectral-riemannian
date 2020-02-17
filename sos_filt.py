@@ -215,8 +215,8 @@ def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
     b_shift = np.ones((M + 1, ), dtype=int) * (filter_bits - 1)
 
     for m in range(M):
-        a[m + 1, :] = quantize_to_int(coeff[m, 3:], scale_coeff[m, 1], filter_bits)
-        b[m + 1, :] = quantize_to_int(coeff[m, :3], scale_coeff[m, 0], filter_bits)
+        a[m + 1, :] = quantize_to_int(coeff[m, 3:], scale_coeff[m, 1], filter_bits, do_round=True)
+        b[m + 1, :] = quantize_to_int(coeff[m, :3], scale_coeff[m, 0], filter_bits, do_round=True)
         a_shift[m + 1] = -comp_shift[m, 1]
         b_shift[m + 1] = -comp_shift[m, 0]
 
