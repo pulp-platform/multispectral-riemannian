@@ -246,11 +246,16 @@ class QuantizedRiemannianModel():
 
         # quantize the classifier
         self.scale_weight = max(self.scale_weight, np.abs(self.classifier.coef_).max())
-        self.scale_bias = max(self.scale_bias, np.abs(self.classifier.intercept_).max())
         weights = quantize(self.classifier.coef_, self.scale_weight, self.num_bits, do_round=True)
-        bias = quantize(self.classifier.intercept_, self.scale_weight, self.num_bits, do_round=True)
         self.classifier.coef_ = weights
-        self.classifier.intercept_ = bias
+
+        # do not quantize the bias, this one will be added in 32 bit, and quantization does not
+        # matter here...
+
+        # self.scale_bias = max(self.scale_bias, np.abs(self.classifier.intercept_).max())
+        # bias = quantize(self.classifier.intercept_, self.scale_weight, self.num_bits,
+        #                 do_round=True)
+        # self.classifier.intercept_ = bias
 
     def score(self, samples, labels):
         """ Measure the performance, returns success rate
@@ -314,8 +319,8 @@ class QuantizedRiemannianModel():
     def get_data_dict(self):
         """ Returns a nested dictionary containing all necessary data """
         return {"num_bits": self.num_bits,
+                "bitshift_scale": self.bitshift_scale,
                 "SVM": {"weights": self.classifier.coef_,
                         "weight_scale": self.scale_weight,
                         "bias": self.classifier.intercept_,
-                        "bias_scale": self.scale_bias},
                 "riemannian": self.riemannian.get_data_dict()}

@@ -12,7 +12,7 @@ from functools import partial
 from filters import butter_fir_filter
 from utils import quantize, quantize_to_int
 from svd import logm
-from sos_filt import quant_sos_filt, prepare_quant_filter
+from sos_filt import quant_sos_filt, prepare_quant_filter, N_FILTER_BITS
 
 __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
@@ -567,10 +567,13 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                                  "y_shift": y_shift}
                                 for coeff, scale, shift, y_scale, y_shift in self.quant_filter_bank],
                 "filter_out_scale": self.scale_filter_out,
+                "filter_n_bits": N_FILTER_BITS,
                 "cov_mat_scale": self.scale_cov_mat,
                 "cov_mat_rho": self.rho,
+                "cov_mat_n_bits": COV_MAT_BITS,
                 "c_ref_invsqrtm": self.c_ref_invsqrtm,
                 "c_ref_invsqrtm_scale": self.scale_ref_invsqrtm,
+                "c_ref_invsqrtm_n_bits": REF_INVSQRTM_BITS,
                 "logm_out_scale": self.scale_logm_out,
                 "features_scale": self.scale_features,
                 "bitshift_scale": self.bitshift_scale}

@@ -204,16 +204,15 @@ def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
 
     N = data.shape[0]
     M = coeff.shape[0]
-    N_prime = N + M * 2 # per section, two samples are added
 
     # quantize x
     x_quant = quantize_to_int(data, scale_data, n_bits)
 
     # generate the coefficients
-    a = np.ones((M + 1, 3), dtype=int) << (n_bits - 1)
-    b = np.ones((M + 1, 3), dtype=int) << (n_bits - 1)
-    a_shift = np.ones((M + 1, ), dtype=int) * (n_bits - 1)
-    b_shift = np.ones((M + 1, ), dtype=int) * (n_bits - 1)
+    a = np.ones((M + 1, 3), dtype=int) << (filter_bits - 1)
+    b = np.ones((M + 1, 3), dtype=int) << (filter_bits - 1)
+    a_shift = np.ones((M + 1, ), dtype=int) * (filter_bits - 1)
+    b_shift = np.ones((M + 1, ), dtype=int) * (filter_bits - 1)
 
     for m in range(M):
         a[m + 1, :] = quantize_to_int(coeff[m, 3:], scale_coeff[m, 1], filter_bits)
@@ -221,17 +220,13 @@ def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
         a_shift[m + 1] = -comp_shift[m, 1]
         b_shift[m + 1] = -comp_shift[m, 0]
 
-    # pad x such that we do not get any index errors
-    x = np.zeros((N_prime, ), dtype=int)
-    x[:N] = x_quant
-
     # internal representation has n_bits: n_bits * 2 (because we multiply two such numbers together)
     # x = x << (n_bits - 1)
 
     if form == 1:
-        y = _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits)
+        y = quant_sos_filt_df1(x_quant, a, b, a_shift, b_shift, intermediate_bits)
     else:
-        y = _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits)
+        y = quant_sos_filt_df2(x_quant, a, b, a_shift, b_shift, intermediate_bits)
 
     # apply the mode
     if mode == "same":
@@ -253,11 +248,16 @@ def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
     return result
 
 
-def _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits):
+def quant_sos_filt_df1(data, a, b, a_shift, b_shift, intermediate_bits=INTERMEDIATE_BITS):
     """ apply sos filter in direct form 1 """
     show_warning = OVERFLOW_WARNING
     M = a.shape[0]
-    N_prime = x.shape[0]
+    N = data.shape[0]
+    N_prime = N + (M - 1) * 2
+
+    # pad x such that we do not get any index errors
+    x = np.zeros((N_prime, ), dtype=int)
+    x[:N] = data
 
     clip_range = 1 << (intermediate_bits - 1)
 
@@ -303,11 +303,16 @@ def _quant_sos_filt_df1(x, a, b, a_shift, b_shift, intermediate_bits):
     return y
 
 
-def _quant_sos_filt_df2(x, a, b, a_shift, b_shift, intermediate_bits):
+def quant_sos_filt_df2(data, a, b, a_shift, b_shift, intermediate_bits):
     """ apply sos filter in direct form 1 """
     show_warning = OVERFLOW_WARNING
     M = a.shape[0]
-    N_prime = x.shape[0]
+    N = data.shape[0]
+    N_prime = N + (M - 1) * 2
+
+    # pad x such that we do not get any index errors
+    x = np.zeros((N_prime, ), dtype=int)
+    x[:N] = data
 
     clip_range = 1 << (intermediate_bits - 1)
 
@@ -394,7 +399,7 @@ def _par_measure(w, t, coeff, n_filter_bits=None, bit_reserve=None):
 
     quant_filter = prepare_quant_filter(coeff, x_scale, y_scale, n_filter_bits, bit_reserve)
 
-    y_acq = quant_sos_filt(x, quant_filter, x_scale, y_scale, filter_bits=n_filter_bits)
+    y_acq = quant_sos_filt(x, quant_filter, x_scale, filter_bits=n_filter_bits)
     y_exp_q = sosfilt(quant_filter[0], x)
 
     a_acq = np.abs(y_acq[-100:]).max()
@@ -465,8 +470,8 @@ def _find_best_params(filter_bank):
 
                             # do the measurement for all frequencies
                             measure_fun = partial(_par_measure, t=t, coeff=coeff,
-                                                    n_filter_bits=n_filter_bits,
-                                                    bit_reserve=bit_reserve)
+                                                  n_filter_bits=n_filter_bits,
+                                                  bit_reserve=bit_reserve)
                             measurement = np.array(list(p.imap(measure_fun, frequency_list)))
 
                             exp = measurement[:, 1]
