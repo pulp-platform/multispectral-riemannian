@@ -114,15 +114,7 @@ class RiemannianMultiscale:
                                          leave=False)))
 
         # calculate mean covariance matrix
-        self.c_ref_invsqrtm = np.zeros((self.n_freq, n_channel, n_channel))
-        for freq_idx in tqdm(list(range(self.n_freq)), desc="Compute mean covariance matrix", leave=False):
-            if self.riem_opt == 'No_Adaptation':
-                self.c_ref_invsqrtm[freq_idx] = np.eye(n_channel)
-            else:
-                # Mean covariance matrix over all trials and temp winds per frequency band
-                cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, n_channel, n_channel),
-                                               metric=self.mean_metric)
-                self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
+        self._compute_c_ref_invsqrtm(cov_mat)
 
         # calculate training features
         if self.use_par:
@@ -236,6 +228,19 @@ class RiemannianMultiscale:
                 out_vec[idx] = sqrt2 * mat[row, col]
                 idx += 1
         return out_vec
+
+    def _compute_c_ref_invsqrtm(self, cov_mat):
+        """ compute c_ref_invsqrtm """
+        self.c_ref_invsqrtm = np.zeros((self.n_freq, self.n_channel, self.n_channel))
+        for freq_idx in tqdm(list(range(self.n_freq)), desc="Compute mean covariance matrix", leave=False):
+            if self.riem_opt == 'No_Adaptation':
+                self.c_ref_invsqrtm[freq_idx] = np.eye(self.n_channel)
+            else:
+                # Mean covariance matrix over all trials and temp winds per frequency band
+                cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, self.n_channel,
+                                                                               self.n_channel),
+                                               metric=self.mean_metric)
+                self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
 
     def _filter_signal(self, data, freq_idx):
         """ Apply the selected filter to the data """
@@ -439,26 +444,22 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                                                                self.scale_input,
                                                                self.scale_filter_out[band]))
 
-        # Quantize Covariance Whitening
-        if self.quant_whitening:
-            for band in range(self.n_freq):
-                # quantize ref_invsqrtm
-                self.scale_ref_invsqrtm[band] = np.abs(self.c_ref_invsqrtm).max()
-                if self.bitshift_scale:
-                    self.scale_ref_invsqrtm[band] = 2 ** np.ceil(np.log2(self.scale_ref_invsqrtm[band]))
-                self.c_ref_invsqrtm[band] = quantize(self.c_ref_invsqrtm[band],
-                                                     self.scale_ref_invsqrtm[band],
-                                                     num_bits=REF_INVSQRTM_BITS, do_round=True)
 
+        """
+        """
+
+
+        # Quantize Covariance Whitening
+        if self.quant_whitening and self.bitshift_scale:
+            for band in range(self.n_freq):
                 # if bitshift scale is enabled, update the scaling for the covariance matrix
-                if self.bitshift_scale:
-                    # Formula for rescale factor: (Rx * Rx * Sy) / (Sx * Sx * Ry)
-                    # The ranges are already powers of two.
-                    # Thus, Sy / Sx^2 must be a power of two. Since Sx is fixed, Sy must be changed.
-                    # Sy = Sx^2 * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx^2))
-                    k = (np.log2(self.scale_cov_mat[band] / (self.scale_filter_out[band] ** 2)))
-                    k = int(np.ceil(k))
-                    self.scale_cov_mat[band] = (self.scale_filter_out[band] ** 2) * (2 ** k)
+                # Formula for rescale factor: (Rx * Rx * Sy) / (Sx * Sx * Ry)
+                # The ranges are already powers of two.
+                # Thus, Sy / Sx^2 must be a power of two. Since Sx is fixed, Sy must be changed.
+                # Sy = Sx^2 * 2^k, k in Z, k = ceil(log2(Sy_prev / Sx^2))
+                k = (np.log2(self.scale_cov_mat[band] / (self.scale_filter_out[band] ** 2)))
+                k = int(np.ceil(k))
+                self.scale_cov_mat[band] = (self.scale_filter_out[band] ** 2) * (2 ** k)
 
         # set the flag to monitor the range to false, the modul can now be used
         self.use_par = old_use_par
@@ -500,6 +501,28 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
             output = self._quantize(output, self.scale_filter_out[freq_idx], do_round=True)
 
         return output
+
+    def _compute_c_ref_invsqrtm(self, cov_mat):
+        """ compute c_ref_invsqrtm """
+        self.c_ref_invsqrtm = np.zeros((self.n_freq, self.n_channel, self.n_channel))
+        for freq_idx in tqdm(list(range(self.n_freq)), desc="Compute mean covariance matrix", leave=False):
+            if self.riem_opt == 'No_Adaptation':
+                self.c_ref_invsqrtm[freq_idx] = np.eye(self.n_channel)
+            else:
+                # Mean covariance matrix over all trials and temp winds per frequency band
+                cov_avg = mean.mean_covariance(cov_mat[:, :, freq_idx].reshape(-1, self.n_channel,
+                                                                               self.n_channel),
+                                               metric=self.mean_metric)
+                self.c_ref_invsqrtm[freq_idx] = base.invsqrtm(cov_avg)
+
+            if not self.monitor_ranges:
+                # quantize ref_invsqrtm, only when not monitoring the ranges
+                self.scale_ref_invsqrtm[freq_idx] = np.abs(self.c_ref_invsqrtm[freq_idx]).max()
+                if self.bitshift_scale:
+                    self.scale_ref_invsqrtm[freq_idx] = 2 ** np.ceil(np.log2(self.scale_ref_invsqrtm[freq_idx]))
+                self.c_ref_invsqrtm[freq_idx] = quantize(self.c_ref_invsqrtm[freq_idx],
+                                                         self.scale_ref_invsqrtm[freq_idx],
+                                                         num_bits=REF_INVSQRTM_BITS, do_round=True)
 
     def _reg_cov_mat(self, data, freq_idx):
         """ Compute the regularized covariance matrix """

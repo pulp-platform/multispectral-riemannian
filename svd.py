@@ -296,13 +296,50 @@ def _givens(a, b):
     return c, s
 
 
+def _givens_diag_new(a, b, c):
+    """ TODO not working for some odd reason... """
+    if b == 0:
+        return 1, 0
+    if a == c:
+        invsqrt2 = np.float32(1) / np.sqrt(np.float32(2))
+        # lambda_1 = a + b
+        # lambda_2 = a - b
+        return invsqrt2, -invsqrt2
+
+    one = np.float32(1)
+    two = np.float32(2)
+    four = np.float32(4)
+
+    # precompute some values
+    a_sqr = a * a
+    b_sqr = b * b
+    c_sqr = c * c
+    a_sqr_plus_c_sqr = a_sqr + c_sqr
+    four_b_sqr_minus_two_a_c = four * b_sqr - two * a * c
+
+    # compute other values
+    alpha = a_sqr_plus_c_sqr + four_b_sqr_minus_two_a_c
+    part_a = (a_sqr_plus_c_sqr - four_b_sqr_minus_two_a_c) / alpha
+    part_b = (a - c) / np.sqrt(alpha)
+    sine_sqr = part_a + part_b
+    if sine_sqr < 0 or sine_sqr > 2:
+        sine_sqr = part_a - part_b
+    sine_sqr = sine_sqr / two
+    print(f"{part_a=}")
+    print(f"{part_b=}")
+    print(f"{sine_sqr=}")
+    sine = np.sqrt(sine_sqr)
+    cosine = np.sqrt(one - sine_sqr)
+    return cosine, sine
+
+
 def _givens_diag(a, b, c):
     """ Computes the parameters for the givens rotation.
 
     The values c = cos(theta), s = sin(theta) are computed, such that:
 
-    | c -s |^T | a  b | | c -s |   | p  0 |
-    | s  c |   | b  c | | s  c | = | 0  q |
+    | c -s | | a  b | | c -s |^T   | p  0 |
+    | s  c | | b  c | | s  c |   = | 0  q |
 
     Parameters
     ----------
