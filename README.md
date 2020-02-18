@@ -15,5 +15,7 @@ Then, make sure to setup the virtual environment properly
 ```
 python -m virtualenv multiscale_bci_python/env
 source multiscale_bci_python/env/bin/activate
-pip install numpy scipy scikit-learn pyriemann matplotlib tqdm
+pip install numpy scipy sklearn pyriemann matplotlib tqdm
 ```
+
+Also, make sure to get the BCI Competition IV dataset 2a and store it in `multiscale_bci_python/dataset`

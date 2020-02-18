@@ -376,12 +376,14 @@ class HalfDiag(Block):
         # self.input_n_bits = 8 # set by default
         self.output_scale = model_dict['riemannian']['features_scale']
         # self.output_n_bits = 8 # set by default
+        sqrt2_scale = 2
+        sqrt2_n_bits = self.input_n_bits
 
         self.bitshift_scale = prepare_bitshift(self.input_scale, self.input_n_bits,
-                                               self.input_scale, self.input_n_bits,
+                                               sqrt2_scale, sqrt2_n_bits,
                                                self.output_scale, self.output_n_bits)
 
-        self.sqrt2 = quantize_to_int(np.sqrt(2), self.input_scale, self.input_n_bits)
+        self.sqrt2 = quantize_to_int(np.sqrt(2), sqrt2_scale, sqrt2_n_bits)
 
     def apply(self, x):
         assert x.shape == self.input_shape
