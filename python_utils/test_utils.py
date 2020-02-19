@@ -8,6 +8,7 @@ __version__ = "0.1.1"
 __date__ = "2020/01/23"
 
 import numpy as np
+from collections import OrderedDict
 
 DOT_LENGTH = 40
 
@@ -93,7 +94,7 @@ class TestLogger:
                     k = "insn"
                 if k == "result":
                     continue
-                if isinstance(v, float) or isinstance(v, np.float32):
+                if isinstance(v, (float, np.float32)):
                     options.append("{}: {:.2E}".format(k, v))
                 else:
                     options.append("{}: {}".format(k, v))
@@ -108,7 +109,10 @@ class TestLogger:
                 if result["result"]:
                     self.num_successful += 1
         else:
-            for case_id in sorted(results):
+            results_iter = sorted(results)
+            if isinstance(results, OrderedDict):
+                results_iter = results
+            for case_id in results_iter:
                 result = results[case_id]
                 if result["result"] is None:
                     success_str = "SKIP"
@@ -121,7 +125,7 @@ class TestLogger:
                         continue
                     if k == "instructions":
                         k = "insn"
-                    if isinstance(v, float) or isinstance(v, np.float32):
+                    if isinstance(v, (float, np.float32)):
                         options.append("{}: {:.2E}".format(k, v))
                     else:
                         options.append("{}: {}".format(k, v))

@@ -1,11 +1,13 @@
 #!/bin/bash
 
 PLATFORM="gvsoc"
+TRAIN_FLAG="> /dev/null"
 
-while getopts "bp:h" name; do
+while getopts "bp:th" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;
+        t) TRAIN_FLAG="-t";;
         h) printf "Usage: %s [-b] [-p platform] [root_folder]\n" $0
            printf " -b            build on the board, equivalent to -p board\n"
            printf " -p <platform> build on the desired platform [board | gvsoc], default is gvsoc\n"
@@ -16,6 +18,13 @@ while getopts "bp:h" name; do
            exit 2;;
     esac
 done
+
+# execute run.sh of the main folder
+cd ..
+bash run.sh -n $TRAIN_FLAG
+cd test
+
+printf "\n"
 
 # search for a virtual environment
 if [ -e ../multiscale_bci_python/env/bin/activate ]; then

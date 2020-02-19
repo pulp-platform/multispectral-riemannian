@@ -48,9 +48,7 @@ class GoldenModel:
         assert model_dict['riemannian']['filter_out_scale'].shape[0] == self.n_freq
         assert model_dict['riemannian']['c_ref_invsqrtm'].shape[0] == self.n_freq
         assert model_dict['riemannian']['c_ref_invsqrtm_scale'].shape[0] == self.n_freq
-        assert model_dict['riemannian']['c_ref_invsqrtm_n_bits'].shape[0] == self.n_freq
         assert model_dict['riemannian']['cov_mat_scale'].shape[0] == self.n_freq
-        assert model_dict['riemannian']['cov_mat_n_bits'].shape[0] == self.n_freq
         assert model_dict['SVM']['weights'].shape[0] == 4
         assert model_dict['SVM']['bias'].shape[0] == 4
 
@@ -60,10 +58,10 @@ class GoldenModel:
         self.svm = SVM(model_dict)
 
         self.input_shape = self.feature_extraction.input_shape
-        self.input_scale = self.feature_extraction.input_shape
+        self.input_scale = self.feature_extraction.input_scale
         self.input_n_bits = self.feature_extraction.input_n_bits
         self.output_shape = self.svm.output_shape
-        self.output_scale = self.svm.output_shape
+        self.output_scale = self.svm.output_scale
         self.output_n_bits = self.svm.output_n_bits
 
     def prepare_input(self, x):
@@ -154,10 +152,10 @@ class SVM(Block):
 
         # quantize the weights and the bias
         self.weight = model_dict['SVM']['weights']
-        self.weight = quantize(self.weight, self.weight_scale, self.weight_n_bits, True)
+        self.weight = quantize_to_int(self.weight, self.weight_scale, self.weight_n_bits, True)
         assert self.weight.shape == (4, *self.input_shape)
         self.bias = model_dict['SVM']['bias']
-        self.bias = quantize(self.bias, self.bias_scale, self.bias_n_bits, True)
+        self.bias = quantize_to_int(self.bias, self.bias_scale, self.bias_n_bits, True)
 
     def apply(self, x):
         assert x.shape == self.input_shape
@@ -167,6 +165,7 @@ class SVM(Block):
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int
+        assert all([-(1 << 31) <= t < (1 << 31) for t in y])
         return y
 
 

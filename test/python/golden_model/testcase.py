@@ -19,7 +19,6 @@ DATA_FILENAME = "../../../data/verification.pkl"
 
 TOLERANCE = 2
 
-
 def test():
     """
     Execute the tests
@@ -44,6 +43,8 @@ def test():
     result.update(test_half_diag(model_dict, data, 'cov_mat_logm', 'features_quant'))
     result.update(test_riemannian_feature(model_dict, data, 'input_quant', 'features_quant'))
     result.update(test_feature_extraction(model_dict, data, 'input_quant', 'features_quant'))
+    result.update(test_svm(model_dict, data, 'features_quant', 'svm_result'))
+    result.update(test_golden_model(data, 'input_quant', 'svm_result'))
 
     logger.show_subcase_result('Individual Block:', result)
 
@@ -51,21 +52,55 @@ def test():
     return logger.summary()
 
 
+def test_golden_model(data, input_name, output_name):
+    '''
+    Test golden model
+    '''
+    block = GoldenModel(MODEL_FILENAME)
+    x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
+    y_acq = block(x)
+    y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+    result = _compare_result(y_exp, y_acq)
+    result = result['1']
+    max_error = result['max error']
+    mean_error = result['avg error']
+
+    success = max_error <= TOLERANCE
+    return {GoldenModel.__name__: {'result': success,
+                                   'max error': max_error,
+                                   'avg error': mean_error}}
+
+
+def test_svm(model_dict, data, input_name, output_name):
+    '''
+    Test SVM
+    '''
+    block = SVM(model_dict)
+    x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
+    y_acq = block(x)
+    y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+    result = _compare_result(y_exp, y_acq)
+    result = result['1']
+    max_error = result['max error']
+    mean_error = result['avg error']
+
+    success = max_error <= TOLERANCE
+    return {SVM.__name__: {'result': success,
+                           'max error': max_error,
+                           'avg error': mean_error}}
+
 def test_feature_extraction(model_dict, data, input_name, output_name):
     '''
     Test FeatureExtraction class
     '''
-    n_freq = len(model_dict['riemannian']['filter_bank'])
-    max_error = 0
-    mean_error = 0
     block = FeatureExtraction(model_dict)
     x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
     y_acq = block(x)
     y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
     result = _compare_result(y_exp, y_acq)
     result = result['1']
-    max_error = max(max_error, result['max error'])
-    mean_error += result['avg error'] / n_freq
+    max_error = result['max error']
+    mean_error = result['avg error']
 
     success = max_error <= TOLERANCE
     return {FeatureExtraction.__name__: {'result': success,

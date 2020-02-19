@@ -23,12 +23,14 @@ def test_main(root_folder):
 
     old_cwd = os.getcwd()
 
+    """
     # go a directory up and build the project, without running it
     os.chdir("..")
     print("Building the project...")
     os.system("./run.sh -n > /dev/null")
     # go back to the test directory
     os.chdir(old_cwd)
+    """
 
     # keep track of statistics
     num_total = 0
