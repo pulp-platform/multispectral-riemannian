@@ -90,7 +90,7 @@ class GoldenModel:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
-        features = self.featrue_extraction(x)
+        features = self.feature_extraction(x)
         y = self.svm(features)
 
         assert y.shape == self.output_shape
@@ -180,7 +180,7 @@ class FeatureExtraction(Block):
         self.freq_band = [RiemannianFeature(model_dict, freq_idx)
                           for freq_idx in range(self.n_freq)]
 
-        self.input_shape = (self.n_freq, *self.freq_band[0].input_shape)
+        self.input_shape = self.freq_band[0].input_shape
         self.input_scale = self.freq_band[0].input_scale
         self.input_n_bits = self.freq_band[0].input_n_bits
         self.output_shape = (prod((self.n_freq, *self.freq_band[0].output_shape)), )
@@ -273,8 +273,14 @@ class CovMat(Block):
         self.input_scale = model_dict['riemannian']['filter_out_scale'][freq_idx]
         self.output_scale = model_dict['riemannian']['cov_mat_scale'][freq_idx]
         self.output_n_bits = model_dict['riemannian']['cov_mat_n_bits']
+
+        self.intermediate_n_bits = 32
+        self.intermediate_scale = solve_for_scale(self.input_scale, self.input_n_bits,
+                                                  self.input_scale, self.input_n_bits,
+                                                  self.intermediate_n_bits)
+
         self.rho = model_dict['riemannian']['cov_mat_rho']
-        self.rho = quantize_to_int(self.rho, self.output_scale, self.output_n_bits)
+        self.rho = quantize_to_int(self.rho, self.intermediate_scale, self.intermediate_n_bits)
 
         # compute bitshift scale
         self.bitshift_scale = prepare_bitshift(self.input_scale, self.input_n_bits,
@@ -286,9 +292,9 @@ class CovMat(Block):
         assert x.dtype == np.int
 
         y = x @ x.T
-        y = apply_bitshift_scale(y, self.bitshift_scale, True)
-
         y = y + np.eye(self.C).astype(int) * self.rho
+
+        y = apply_bitshift_scale(y, self.bitshift_scale, True)
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int
@@ -312,9 +318,16 @@ class Whitening(Block):
         self.output_scale = solve_for_scale_sqr(self.input_scale, self.input_n_bits,
                                                 self.ref_invsqrtm_scale, self.ref_invsqrtm_n_bits,
                                                 self.output_n_bits)
+
+        # check that c_ref is quantized
+        c_ref_invsqrtm = model_dict['riemannian']['c_ref_invsqrtm'][freq_idx]
+        np.testing.assert_almost_equal(c_ref_invsqrtm,
+                                       quantize(c_ref_invsqrtm, self.ref_invsqrtm_scale,
+                                                self.ref_invsqrtm_n_bits, do_round=True))
+
         # quantize ref_invsqrtm to integer
-        self.ref_invsqrtm = quantize_to_int(model_dict['riemannian']['c_ref_invsqrtm'][freq_idx],
-                                            self.ref_invsqrtm_scale, self.ref_invsqrtm_n_bits)
+        self.ref_invsqrtm = quantize_to_int(c_ref_invsqrtm, self.ref_invsqrtm_scale,
+                                            self.ref_invsqrtm_n_bits)
 
     def apply(self, x):
         assert x.shape == self.input_shape
@@ -383,6 +396,11 @@ class HalfDiag(Block):
                                                sqrt2_scale, sqrt2_n_bits,
                                                self.output_scale, self.output_n_bits)
 
+        self.bitshift_scale_diag = np.log2(self.output_scale / self.input_scale)
+        np.testing.assert_almost_equal(self.bitshift_scale_diag,
+                                       np.round(self.bitshift_scale_diag))
+        self.bitshift_scale_diag = int(np.round(self.bitshift_scale_diag))
+
         self.sqrt2 = quantize_to_int(np.sqrt(2), sqrt2_scale, sqrt2_n_bits)
 
     def apply(self, x):
@@ -392,7 +410,7 @@ class HalfDiag(Block):
         y = np.zeros(self.output_shape).astype(int)
 
         # first, fill in the diagonal elements
-        y[:self.C] = np.diag(x)
+        y[:self.C] = apply_bitshift_scale(np.diag(x), self.bitshift_scale_diag)
 
         # now, fill in the remaining elements
         idx = self.C
@@ -401,8 +419,7 @@ class HalfDiag(Block):
                 y[idx] = x[col, row] * self.sqrt2
                 idx += 1
 
-        # scale everything back
-        apply_bitshift_scale(y, self.bitshift_scale)
+        y[self.C:] = apply_bitshift_scale(y[self.C:], self.bitshift_scale)
 
         assert y.shape == self.output_shape
         assert y.dtype == np.int

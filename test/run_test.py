@@ -21,8 +21,6 @@ RESET_COLOR = "\033[0;0m"
 def test_main(root_folder):
     """ main function """
 
-    print(os.environ['PYTHONPATH'])
-
     old_cwd = os.getcwd()
 
     # go a directory up and build the project, without running it

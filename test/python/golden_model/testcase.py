@@ -10,12 +10,14 @@ from golden_model import GoldenModel, SVM, FeatureExtraction, RiemannianFeature,
     Whitening, Logm, HalfDiag
 import functional as F
 
+np.set_printoptions(linewidth=200)
+
 # TODO add a meaningful name for the test
 TESTNAME = "python::GoldenModel"
 MODEL_FILENAME = "../../../data/model.pkl"
 DATA_FILENAME = "../../../data/verification.pkl"
 
-TOLERANCE = 6
+TOLERANCE = 2
 
 
 def test():
@@ -34,17 +36,89 @@ def test():
     result.update(test_riemannian_block(model_dict, data, Filter,
                                         'input_quant', 'filter_out'))
     result.update(test_riemannian_block(model_dict, data, CovMat,
-                                        'filter_out', 'cov_mat_reg'))
+                                        'filter_out', 'cov_mat_reg_quant'))
     result.update(test_riemannian_block(model_dict, data, Whitening,
-                                        'cov_mat_reg', 'cov_mat_transform'))
+                                        'cov_mat_reg_quant', 'cov_mat_transform'))
     result.update(test_riemannian_block(model_dict, data, Logm,
                                         'cov_mat_transform', 'cov_mat_logm'))
-    result.update(test_riemannian_block(model_dict, data, HalfDiag,
-                                        'cov_mat_logm', 'features'))
-    logger.show_subcase_result('Individual Blocks:', result)
+    result.update(test_half_diag(model_dict, data, 'cov_mat_logm', 'features_quant'))
+    result.update(test_riemannian_feature(model_dict, data, 'input_quant', 'features_quant'))
+    result.update(test_feature_extraction(model_dict, data, 'input_quant', 'features_quant'))
+
+    logger.show_subcase_result('Individual Block:', result)
 
     # return summary
     return logger.summary()
+
+
+def test_feature_extraction(model_dict, data, input_name, output_name):
+    '''
+    Test FeatureExtraction class
+    '''
+    n_freq = len(model_dict['riemannian']['filter_bank'])
+    max_error = 0
+    mean_error = 0
+    block = FeatureExtraction(model_dict)
+    x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
+    y_acq = block(x)
+    y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+    result = _compare_result(y_exp, y_acq)
+    result = result['1']
+    max_error = max(max_error, result['max error'])
+    mean_error += result['avg error'] / n_freq
+
+    success = max_error <= TOLERANCE
+    return {FeatureExtraction.__name__: {'result': success,
+                                         'max error': max_error,
+                                         'avg error': mean_error}}
+
+
+def test_riemannian_feature(model_dict, data, input_name, output_name):
+    '''
+    Test RiemannianFeature class
+    '''
+    n_freq = len(model_dict['riemannian']['filter_bank'])
+    max_error = 0
+    mean_error = 0
+    for freq_idx in range(n_freq):
+        block = RiemannianFeature(model_dict, freq_idx)
+        x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
+        y_acq = block(x)
+        y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+        y_exp = y_exp[len(y_acq) * freq_idx:len(y_acq) * (freq_idx + 1)]
+        result = _compare_result(y_exp, y_acq)
+        result = result['1']
+        max_error = max(max_error, result['max error'])
+        mean_error += result['avg error'] / n_freq
+
+    success = max_error <= TOLERANCE
+    return {RiemannianFeature.__name__: {'result': success,
+                                'max error': max_error,
+                                'avg error': mean_error}}
+
+
+def test_half_diag(model_dict, data, input_name, output_name):
+    '''
+    Test HalfDiag class
+    '''
+    n_freq = len(model_dict['riemannian']['filter_bank'])
+    max_error = 0
+    mean_error = 0
+    for freq_idx in range(n_freq):
+        block = HalfDiag(model_dict, freq_idx)
+        x = F.quantize_to_int(data[input_name][freq_idx], block.input_scale, block.input_n_bits, do_round=True)
+        y_acq = block(x)
+        y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+        y_exp = y_exp[len(y_acq) * freq_idx:len(y_acq) * (freq_idx + 1)]
+        result = _compare_result(y_exp, y_acq)
+        result = result['1']
+        max_error = max(max_error, result['max error'])
+        mean_error += result['avg error'] / n_freq
+
+    success = max_error <= TOLERANCE
+    return {HalfDiag.__name__: {'result': success,
+                                'max error': max_error,
+                                'avg error': mean_error}}
 
 
 def test_riemannian_block(model_dict, data, block_class, input_name, output_name):
@@ -57,7 +131,7 @@ def test_riemannian_block(model_dict, data, block_class, input_name, output_name
     mean_error = 0
     for freq_idx in range(n_freq):
         block = block_class(model_dict, freq_idx)
-        x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits)
+        x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
         if not input_name == 'input_quant':
             x = x[freq_idx]
         y_acq = block(x)
@@ -74,7 +148,7 @@ def test_riemannian_block(model_dict, data, block_class, input_name, output_name
                                    'avg error': mean_error}}
 
 
-def _compare_result(y_exp, y_hat, test_index=1, tolerance=6, epsilon=1e-4):
+def _compare_result(y_exp, y_hat, test_index=1, tolerance=1, epsilon=1e-4):
     """
     The error is computed in the following way:
     1. Scale the acquired output y_hat back into regular floating point representation
