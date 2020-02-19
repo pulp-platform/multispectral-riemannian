@@ -20,7 +20,7 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 FIXPOINT_IIR_IMPLEMENTATION = True
 COMPUTE_IN_PARALLEL = True
 
-REF_INVSQRTM_BITS = 12
+REF_INVSQRTM_BITS = 10
 COV_MAT_BITS = 16
 
 
@@ -392,16 +392,22 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         x_cov_reg = np.array([(X + np.eye(C) * self.rho) for X in x_cov])
         result["cov_mat_reg"] = x_cov_reg
 
+        # quantize covariance matrix
+        x_cov_reg = np.array([self._quantize(x_cov_reg[freq_idx], self.scale_cov_mat[freq_idx],
+                                             num_bits=COV_MAT_BITS, do_round=True)
+                              for freq_idx in range(self.n_freq)])
+        result["cov_mat_reg_quant"] = x_cov_reg
+
         # transform the covariance matrix with the mean covariance matrix
         x_cov_transform = np.array([C @ X @ C for X, C in zip(x_cov_reg, self.c_ref_invsqrtm)])
         result["cov_mat_transform"] = x_cov_transform
 
         # apply logm
         x_cov_logm = np.array([logm(X) for X in x_cov_transform])
-        result["cov_mat_logm"] = x_cov_logm
 
-        # quantize zhe output of logm
-        x_cov_logm = self._quantize(x_cov_logm, self.scale_logm_out, do_round=False)
+        # quantize the output of logm
+        x_cov_logm = self._quantize(x_cov_logm, self.scale_logm_out, do_round=True)
+        result["cov_mat_logm"] = x_cov_logm
 
         # apply half-vectorization
         features = np.array([self.half_vectorization(X) for X in x_cov_logm]).ravel()
@@ -443,11 +449,6 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
             self.quant_filter_bank.append(prepare_quant_filter(self.filter_bank[band],
                                                                self.scale_input,
                                                                self.scale_filter_out[band]))
-
-
-        """
-        """
-
 
         # Quantize Covariance Whitening
         if self.quant_whitening and self.bitshift_scale:
@@ -579,7 +580,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         if self.monitor_ranges:
             self.scale_logm_out = max(self.scale_logm_out, np.abs(mat_log).max())
         else:
-            mat_log = self._quantize(mat_log, self.scale_logm_out)
+            mat_log = self._quantize(mat_log, self.scale_logm_out, do_round=True)
 
         return self.half_vectorization(mat_log)
 
