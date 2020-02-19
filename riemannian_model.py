@@ -313,7 +313,8 @@ class QuantizedRiemannianModel():
         result = self.riemannian.onetrial_feature_with_intermediate(sample)
         features = next(reversed(result.values()))
         features = features.reshape(1, -1)
-        result["svm_result"] = self.classifier.predict(features)
+        result["svm_result"] = self.classifier.decision_function(features)
+        result["prediction"] = self.classifier.predict(features)
         return result
 
     def get_data_dict(self):

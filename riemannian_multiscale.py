@@ -20,7 +20,7 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 FIXPOINT_IIR_IMPLEMENTATION = True
 COMPUTE_IN_PARALLEL = True
 
-REF_INVSQRTM_BITS = 10
+REF_INVSQRTM_BITS = 11
 COV_MAT_BITS = 16
 
 
@@ -357,7 +357,7 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         """ Returns an ordered dict containing the results of all intermediate steps of the computation """
         assert not self.monitor_ranges, "Call \"self.determine_range\" before using \"self.onetrial_feature_with_intermediate\""
 
-        C, T = data.shape
+        C, _ = data.shape
 
         result = OrderedDict()
 
@@ -382,14 +382,12 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         x_cov = np.array([X @ X.T for X in x_filt])
         result["cov_mat"] = x_cov
 
-        # quantize covariance matrix
-        x_cov = np.array([self._quantize(x_cov[freq_idx], self.scale_cov_mat[freq_idx],
-                                         num_bits=COV_MAT_BITS, do_round=True)
-                          for freq_idx in range(self.n_freq)])
-        result["cov_mat_quant"] = x_cov
-
         # scale covariance matrix and add offset
-        x_cov_reg = np.array([(X + np.eye(C) * self.rho) for X in x_cov])
+        x_cov_reg = np.zeros_like(x_cov)
+        for freq_idx in range(self.n_freq):
+            rho_scale = (1 << 31) * (self.scale_filter_out[freq_idx] ** 2) / ((1 << (self.num_bits - 1)) ** 2)
+            rho = quantize(self.rho, rho_scale, 32, do_round=True)
+            x_cov_reg[freq_idx] = x_cov[freq_idx] + np.eye(C) * rho
         result["cov_mat_reg"] = x_cov_reg
 
         # quantize covariance matrix
@@ -532,8 +530,15 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
 
         mul_result = np.dot(data, np.transpose(data))
 
+        # quantize the rho
+        if self.monitor_ranges:
+            rho = self.rho
+        else:
+            rho_scale = (1 << 31) * (self.scale_filter_out[freq_idx] ** 2) / ((1 << (self.num_bits - 1)) ** 2)
+            rho = quantize(self.rho, rho_scale, 32, do_round=True)
+
         # cov_mat = 1/(n_samples-1) * mul_result + self.rho/n_samples*np.eye(n_channel)
-        cov_mat = mul_result + self.rho * np.eye(n_channel)
+        cov_mat = mul_result + rho * np.eye(n_channel)
 
         # do not quantize the covariance matrix here, because we should compute the
         # reference matrix in full precision

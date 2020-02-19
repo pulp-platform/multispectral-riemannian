@@ -27,15 +27,16 @@ CROSS_VALIDATION = False
 CV_NO_SPLITS = 5
 NO_SUBJECTS = 9
 RANDOM_SEED = 1 # None
+RHO = 1
 
 
 def main():
     """ main function """
 
     if QUANTIZED:
-        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT)
+        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
     else:
-        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT)
+        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
 
 
     # success rate sum over all subjects
@@ -96,7 +97,7 @@ def main_export(subject, sample_idx, foldername):
     test_label = test_labels[sample_idx]
 
     history = model.predict_with_intermediate(test_sample)
-    history["expected_label"] = test_label
+    history["expectation"] = test_label
 
     # generate the folder if it does not yet exist
     if not os.path.exists(foldername):
