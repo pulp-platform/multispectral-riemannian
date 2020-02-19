@@ -4,6 +4,8 @@ __author__ = "Tibor Schneider"
 __email__ = "sctibor@student.ethz.ch"
 
 import numpy as np
+import os
+import cffi
 
 from utils import quantize_to_int, dequantize_to_float, quantize
 
@@ -21,6 +23,29 @@ INTERMEDIATE_BITS = 16
 DEFAULT_FORM = 1
 OVERFLOW_WARNING = True
 OVERFLOW_RAISE = False
+
+FFI_HDR = """
+int quant_sos_filt_df1(const int64_t* x,
+                       const int64_t* a,
+                       const int64_t* b,
+                       const int64_t* a_shift,
+                       const int64_t* b_shift,
+                       int N_prime,
+                       int M,
+                       int intermediate_bits,
+                       int64_t* y);
+"""
+FFI_LIB = "accel_sos_filt.so"
+
+def init_cffi_lib():
+    ffi = cffi.FFI()
+    ffi.cdef(FFI_HDR)
+    path = os.path.dirname(os.path.abspath(__file__))
+    lib_file = os.path.join(path, FFI_LIB)
+    lib = ffi.dlopen(lib_file)
+    return ffi, lib
+
+FFI, LIB = init_cffi_lib()
 
 def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_reserve=BIT_RESERVE):
     """ Quantizes the sos filter coefficients and prepares the scale ranges.
@@ -249,6 +274,38 @@ def quant_sos_filt(data, quant_filter, scale_data, mode="sosfilt", n_bits=8,
 
 
 def quant_sos_filt_df1(data, a, b, a_shift, b_shift, intermediate_bits=INTERMEDIATE_BITS):
+    """ C interface to apply sos filter in direct form 1 """
+    M = a.shape[0]
+    N = data.shape[0]
+    N_prime = N + (M - 1) * 2
+
+    # pad x such that we do not get any index errors
+    x = np.zeros((N_prime, ), dtype=np.int64)
+    x[:N] = data.astype(np.int64)
+    y = np.zeros((N_prime, ), dtype=np.int64)
+
+    a = a.astype(np.int64)
+    b = b.astype(np.int64)
+    a_shift = a_shift.astype(np.int64)
+    b_shift = b_shift.astype(np.int64)
+
+    ret = LIB.quant_sos_filt_df1(FFI.cast("int64_t*", x.ctypes.data),
+                                 FFI.cast("int64_t*", a.ctypes.data),
+                                 FFI.cast("int64_t*", b.ctypes.data),
+                                 FFI.cast("int64_t*", a_shift.ctypes.data),
+                                 FFI.cast("int64_t*", b_shift.ctypes.data),
+                                 FFI.cast("int", N_prime),
+                                 FFI.cast("int", M),
+                                 FFI.cast("int", intermediate_bits),
+                                 FFI.cast("int64_t*", y.ctypes.data))
+
+    if ret != 0:
+        raise OverflowError()
+
+    return y
+
+
+def quant_sos_filt_df1_python(data, a, b, a_shift, b_shift, intermediate_bits=INTERMEDIATE_BITS):
     """ apply sos filter in direct form 1 """
     show_warning = OVERFLOW_WARNING
     M = a.shape[0]
