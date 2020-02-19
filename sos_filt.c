@@ -46,7 +46,7 @@ int quant_sos_filt_df1(const int64_t* x,
 
             // handle overflow
             if (acc < clip_range_neg || acc > clip_range_pos) {
-                printf("overflow with %d\n", acc);
+                printf("overflow with %ld\n", acc);
                 return 1;
             }
 
