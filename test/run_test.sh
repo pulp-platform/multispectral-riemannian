@@ -1,13 +1,13 @@
 #!/bin/bash
 
 PLATFORM="gvsoc"
-TRAIN_FLAG="> /dev/null"
+TRAIN=false
 
 while getopts "bp:th" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;
-        t) TRAIN_FLAG="-t";;
+        t) TRAIN=true;;
         h) printf "Usage: %s [-b] [-p platform] [root_folder]\n" $0
            printf " -b            build on the board, equivalent to -p board\n"
            printf " -p <platform> build on the desired platform [board | gvsoc], default is gvsoc\n"
@@ -21,7 +21,12 @@ done
 
 # execute run.sh of the main folder
 cd ..
-bash run.sh -n $TRAIN_FLAG
+printf "Building the main project...\n"
+if [ "$TRAIN" = true ]; then
+    bash run.sh -n -t
+else
+    bash run.sh -n > /dev/null
+fi
 cd test
 
 printf "\n"
