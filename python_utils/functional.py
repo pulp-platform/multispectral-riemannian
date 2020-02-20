@@ -233,7 +233,8 @@ def apply_bitshift_scale(x, bitshift, do_round=True):
     assert bitshift >= 0
 
     if do_round and bitshift > 0:
-        x += np.sign(x) * (1 << (bitshift - 1))
+        #x += np.sign(x) * (1 << (bitshift - 1))
+        x += (1 << (bitshift - 1))
 
     # check if an overflow is happending
     if x.min() < -(1 << 31) or x.max() > ((1 << 31) - 1):
