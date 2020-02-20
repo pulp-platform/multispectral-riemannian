@@ -74,6 +74,7 @@ class RiemannianMultiscale:
             self.mean_metric = 'euclid'
         self.riem_opt = riem_opt
         self.use_par = COMPUTE_IN_PARALLEL
+        self.sqrt2 = np.sqrt(2)
 
         # regularization
         self.rho = rho
@@ -221,11 +222,10 @@ class RiemannianMultiscale:
         for diag in range(0, N):
             out_vec[diag] = mat[diag, diag]
 
-        sqrt2 = np.sqrt(2)
         idx = N
         for col in range(1, N):
             for row in range(0, col):
-                out_vec[idx] = sqrt2 * mat[row, col]
+                out_vec[idx] = self.sqrt2 * mat[row, col]
                 idx += 1
         return out_vec
 
@@ -460,11 +460,16 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
                 k = int(np.ceil(k))
                 self.scale_cov_mat[band] = (self.scale_filter_out[band] ** 2) * (2 ** k)
 
+        # quantize the sqrt(2)
+        sqrt2_scale = 2 # must be a power of two
+        sqrt2_n_bits = self.num_bits
+        self.sqrt2 = quantize(np.sqrt(2), sqrt2_scale, sqrt2_n_bits, do_round=True)
+
         # set the flag to monitor the range to false, the modul can now be used
         self.use_par = old_use_par
         self.monitor_ranges = False
 
-    def _quantize(self, data, factor, do_round=False, num_bits=None):
+    def _quantize(self, data, factor, do_round=True, num_bits=None):
         """ Quantize the data to the given number of levels """
         if num_bits is None:
             num_bits = self.num_bits
