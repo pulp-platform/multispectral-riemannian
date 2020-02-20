@@ -4,6 +4,12 @@
 Model for Riemannian feature calculation and classification for EEG data
 '''
 
+# hide all sklearn warnings
+def warn(*args, **kwargs):
+    pass
+import warnings
+warnings.warn = warn
+
 import time
 import os
 import pickle
