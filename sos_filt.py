@@ -411,9 +411,6 @@ def quant_sos_filt_df2(data, a, b, a_shift, b_shift, intermediate_bits):
 
 
 def _plot(band, coeff):
-    from scipy.signal import sosfilt
-    import matplotlib.pyplot as plt
-
     w_below = band[0] / 2
     w_inside = (band[0] + band[1]) / 2
     w_above = band[1] * 2
@@ -430,7 +427,7 @@ def _plot(band, coeff):
         quant_filter = prepare_quant_filter(coeff, x_scale, y_scale)
 
         y_exp = sosfilt(quant_filter[0], x)
-        y_acq = quant_sos_filt(x, quant_filter, x_scale, y_scale)
+        y_acq = quant_sos_filt(x, quant_filter, x_scale)
 
         plt.plot(y_exp, label="expected")
         plt.plot(y_acq, label="acquired")
@@ -577,7 +574,7 @@ def _test():
     bank = load_filterbank([2], fs=250, order=2)
     # _find_best_params(bank)
     for band, coeff in zip(bands, bank):
-        # _plot(band, coeff)
+        _plot(band, coeff)
         _sweep(band, coeff)
 
 

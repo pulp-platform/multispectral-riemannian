@@ -116,12 +116,7 @@ def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=
         # the formula for calculating the two eigenvalues, with main_diag[k] = ak and offdiag[0] = b
         # lambda1 = a1*c^2 - 2 b*c*s + a2 * s^2
         # lambda2 = a1*s^2 + 2 b*c*s + a2 * c^2
-        c, s = _givens_diag(main_diag[0], off_diag[0], main_diag[1])
-        c_square = c * c
-        s_square = s * s
-        bcs2 = off_diag[0] * c * s * np.float32(2)
-        lambda1 = main_diag[0] * c_square - bcs2 + main_diag[1] * s_square
-        lambda2 = main_diag[0] * s_square + bcs2 + main_diag[1] * c_square
+        c, s, lambda1, lambda2 = _evd_2x2(main_diag[0], off_diag[0], main_diag[1])
         if with_n_iter:
             return np.array([lambda1, lambda2]), np.array([[c, -s], [s, c]]), 1
         return np.array([lambda1, lambda2]), np.array([[c, -s], [s, c]])
@@ -296,44 +291,166 @@ def _givens(a, b):
     return c, s
 
 
-def _givens_diag_new(a, b, c):
-    """ TODO not working for some odd reason... """
-    if b == 0:
-        return 1, 0
-    if a == c:
-        invsqrt2 = np.float32(1) / np.sqrt(np.float32(2))
-        # lambda_1 = a + b
-        # lambda_2 = a - b
-        return invsqrt2, -invsqrt2
+def _evd_2x2(a, b, c):
+    """ Returns the eigenvalue decomposition of a 2x2 symmetric matrix:
 
+        | cs -sn |^T | a  b | | cs -sn |   | rt1  0 |
+        | sn  cs |   | b  c | | sn  cs | = | 0  rt2 |
+
+    The algorithm was copied from LAPACK SLAEV2.f
+
+    Parameters
+    ----------
+    a: np.float32, main diagonal
+    b: np.float32, off diagonal
+    c: np.float32, main diagonal
+
+    Returns
+    -------
+    cs: np.float32, cosine
+    sn: np.float32, sine
+    rt1: np.float32, first (larger) eigenvalue
+    rt2: np.float32, second (smaller) eigenvalue
+    """
+    zero = np.float32(0)
+    half = np.float32(0.5)
     one = np.float32(1)
     two = np.float32(2)
-    four = np.float32(4)
 
-    # precompute some values
-    a_sqr = a * a
-    b_sqr = b * b
-    c_sqr = c * c
-    a_sqr_plus_c_sqr = a_sqr + c_sqr
-    four_b_sqr_minus_two_a_c = four * b_sqr - two * a * c
+    sm = a + c
+    df = a - c
+    adf = abs(df)
+    tb = b + b
+    ab = abs(tb)
+    if abs(a) > abs(c):
+        acmx = a
+        acmn = c
+    else:
+        acmx = c
+        acmn = a
 
-    # compute other values
-    alpha = a_sqr_plus_c_sqr + four_b_sqr_minus_two_a_c
-    part_a = (a_sqr_plus_c_sqr - four_b_sqr_minus_two_a_c) / alpha
-    part_b = (a - c) / np.sqrt(alpha)
-    sine_sqr = part_a + part_b
-    if sine_sqr < 0 or sine_sqr > 2:
-        sine_sqr = part_a - part_b
-    sine_sqr = sine_sqr / two
-    print(f"{part_a=}")
-    print(f"{part_b=}")
-    print(f"{sine_sqr=}")
-    sine = np.sqrt(sine_sqr)
-    cosine = np.sqrt(one - sine_sqr)
-    return cosine, sine
+    if adf > ab:
+        rt = adf * np.sqrt(one + (ab / adf) ** 2)
+    elif adf < ab:
+        rt = ab * np.sqrt(one + (adf / ab) ** 2)
+    else:
+        rt = ab * np.sqrt(two)
+
+    if sm < zero:
+        rt1 = half * (sm - rt)
+        sgn1 = -1
+        rt2 = (acmx / rt1) * acmn - (b / rt1) * b
+    elif sm > zero:
+        rt1 = half * (sm + rt)
+        sgn1 = 1
+        rt2 = (acmx / rt1) * acmn - (b / rt1) * b
+    else:
+        rt1 = half * rt
+        rt2 = -half * rt
+        sgn1 = 1
+
+    if df >= zero:
+        cs = df + rt
+        sgn2 = 1
+    else:
+        cs = df - rt
+        sgn2 = -1
+
+    acs = abs(cs)
+    if acs > ab:
+        ct = -tb / cs
+        sn1 = one / np.sqrt(one + ct * ct)
+        cs1 = ct * sn1
+    else:
+        if ab == zero:
+            cs1 = one
+            sn1 = zero
+        else:
+            tn = -cs / tb
+            cs1 = one / np.sqrt(one + tn * tn)
+            sn1 = tn * cs1
+
+    if sgn1 == sgn2:
+        tn = cs1
+        cs1 = -sn1
+        sn1 = tn
+
+    return cs1, sn1, rt1, rt2
 
 
 def _givens_diag(a, b, c):
+    """ Returns the rotation for the eigenvalue decomposition of a 2x2 symmetric matrix:
+
+        | cs -sn | | a  b | | cs -sn |^T   | rt1  0 |
+        | sn  cs | | b  c | | sn  cs |   = | 0  rt2 |
+
+    Note, that the sine is defined differently to the funciton _evd_2x2
+
+    The algorithm was copied and modified from LAPACK SLAEV2.f
+
+    Parameters
+    ----------
+    a: np.float32, main diagonal
+    b: np.float32, off diagonal
+    c: np.float32, main diagonal
+
+    Returns
+    -------
+    cs: np.float32, cosine
+    sn: np.float32, sine
+    """
+    zero = np.float32(0)
+    one = np.float32(1)
+    two = np.float32(2)
+
+    sm = a + c
+    df = a - c
+    adf = abs(df)
+    tb = b + b
+    ab = abs(tb)
+
+    if adf > ab:
+        rt = adf * np.sqrt(one + (ab / adf) ** 2)
+    elif adf < ab:
+        rt = ab * np.sqrt(one + (adf / ab) ** 2)
+    else:
+        rt = ab * np.sqrt(two)
+
+    if sm < zero:
+        sgn1 = -1
+    else:
+        sgn1 = 1
+
+    if df >= zero:
+        cs = df + rt
+        sgn2 = 1
+    else:
+        cs = df - rt
+        sgn2 = -1
+
+    acs = abs(cs)
+    if acs > ab:
+        ct = -tb / cs
+        sn1 = one / np.sqrt(one + ct * ct)
+        cs1 = ct * sn1
+    else:
+        if ab == zero:
+            cs1 = one
+            sn1 = zero
+        else:
+            tn = -cs / tb
+            cs1 = one / np.sqrt(one + tn * tn)
+            sn1 = tn * cs1
+
+    if sgn1 == sgn2:
+        tn = cs1
+        cs1 = -sn1
+        sn1 = tn
+
+    return cs1, -sn1
+
+
+def _givens_diag_old(a, b, c):
     """ Computes the parameters for the givens rotation.
 
     The values c = cos(theta), s = sin(theta) are computed, such that:
