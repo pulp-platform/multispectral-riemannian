@@ -45,7 +45,7 @@ printf "Testing on Platform: %s\n\n" $PLATFORM
 ROOT=${@:$OPTIND:1}
 
 # setup environmental variables
-export PYTHONPATH="$PYTHONPATH:$(pwd)/../python_utils:$(pwd)/../multiscale_bci_python"
+export PYTHONPATH="$(pwd)/../python_utils:$(pwd)/../multiscale_bci_python:$PYTHONPATH"
 
 # set the platform
 export PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
@@ -53,4 +53,4 @@ export PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
 # always store the trace file
 # PULP_CURRENT_CONFIG_ARGS+=" gvsoc/trace=l2_priv:$(pwd)/../build/trace.txt"
 
-python3 run_test.py $ROOT
+python run_test.py $ROOT
