@@ -17,7 +17,7 @@ TESTNAME = "python::GoldenModel"
 MODEL_FILENAME = "../../../data/model.pkl"
 DATA_FILENAME = "../../../data/verification.pkl"
 
-TOLERANCE = 2
+TOLERANCE = 6
 
 def test():
     """
@@ -60,6 +60,9 @@ def test_golden_model(data, input_name, output_name):
     x = F.quantize_to_int(data[input_name], block.input_scale, block.input_n_bits, do_round=True)
     y_acq = block(x)
     y_exp = F.quantize_to_int(data[output_name], block.output_scale, block.output_n_bits)
+    # shift the results back by 8 bits
+    y_acq = F.apply_bitshift_scale(y_acq, 9)
+    y_exp = F.apply_bitshift_scale(y_exp, 9)
     result = _compare_result(y_exp, y_acq)
     result = result['1']
     max_error = result['max error']
