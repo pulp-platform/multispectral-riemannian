@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from functools import partial
 
 from filters import butter_fir_filter
-from utils import quantize, quantize_to_int
+from utilities import quantize, quantize_to_int
 from svd import logm
 from sos_filt import quant_sos_filt, prepare_quant_filter, N_FILTER_BITS
 

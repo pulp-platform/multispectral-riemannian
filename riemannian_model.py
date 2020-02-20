@@ -9,7 +9,7 @@ from sklearn.svm import LinearSVC, SVC
 
 from riemannian_multiscale import RiemannianMultiscale, QuantizedRiemannianMultiscale
 from filters import load_filterbank
-from utils import quantize
+from utilities import quantize
 
 __author__ = "Michael Hersche, Tino Rellstab and Tibor Schneider"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"

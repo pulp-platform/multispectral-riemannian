@@ -7,7 +7,7 @@ import numpy as np
 import os
 import cffi
 
-from utils import quantize_to_int, dequantize_to_float, quantize
+from utilities import quantize_to_int, dequantize_to_float, quantize
 
 # used for testing
 from scipy.signal import sosfilt
