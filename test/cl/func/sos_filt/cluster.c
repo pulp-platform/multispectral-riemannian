@@ -24,7 +24,7 @@ int do_bench(rt_perf_t* perf, int events) {
     for (int i = 0; i < LENGTH; i++) {
         if (y_vec_l1[i] != exp_vec_l1[i]) {
             success = 1;
-            printf("error at: %d: exp=%d, acq=%d\n", i, y_vec_l1[i], exp_vec_l1[i]);
+            printf("error at: %d: acq=%d, exp=%d\n", i, y_vec_l1[i], exp_vec_l1[i]);
         }
     }
 

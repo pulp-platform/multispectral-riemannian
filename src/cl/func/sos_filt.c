@@ -46,7 +46,7 @@ void func_sos_filt(const int8_t* p_x,
 
 }
 
-#define _ZERO2 = (v2s){0, 0};
+#define _ZERO2 ((v2s){0, 0})
 
 /**
  * @brief Applies a SOS IIR filter to the input data with exactly 2 sections
@@ -84,9 +84,15 @@ void func_sos_filt_2S(const int8_t* p_x,
     int _shift_b0 = params->shift_b0;
     int _shift_b1 = params->shift_b1;
 
+    _shift_b0 -= _shift_a1;
+    _shift_b1 -= _shift_a1;
+
     // create coefficients
     v2s _a01 = params->a01;
     v2s _a11 = params->a11;
+
+    _a01 = __SUB2(_ZERO2, _a01);
+    _a11 = __SUB2(_ZERO2, _a11);
 
     int32_t _b00 = params->b00;
     v2s _b01 = params->b01;
@@ -102,18 +108,20 @@ void func_sos_filt_2S(const int8_t* p_x,
         _x0 = (int32_t)(*_p_x_iter++);
 
         // Seciton 1
-        _x1 = _x0 * _b00;
+        _x1 = __MULS(_x0, _b00);
         _x1 = __SUMDOTP2(_reg0, _b01, _x1);
-        _x1 = _x1 >> _shift_b0;
-        _tmp = __DOTP2(_reg1, _a01) >> _shift_a0;
-        _x1 -= _tmp;
+        _x1 = __ROUNDNORM_REG(_x1, _shift_b0);
+
+        _x1 = __SUMDOTP2(_reg1, _a01, _x1);
+        _x1 = __ROUNDNORM_REG(_x1, _shift_a0);
 
         // Section 2
-        _x2 = _x1 * _b10;
-        _x2 = __SUMDOTP2(_reg1, _b11, _x2);
-        _x2 = _x2 >> _shift_b1;
-        _tmp = __DOTP2(_reg2, _a11) >> _shift_a0;
-        _x2 -= _tmp;
+        _x2 = __DOTP2(_reg1, _b11);
+        _x2 = __MACS(_x2, _x1, _b10);
+        _x2 = __ROUNDNORM_REG(_x2, _shift_b1);
+
+        _x2 = __SUMDOTP2(_reg2, _a11, _x2);
+        _x2 = __ROUNDNORM_REG(_x2, _shift_a1);
 
         // store the output
         *_p_y_iter++ = _x2 >> _y_shift;
