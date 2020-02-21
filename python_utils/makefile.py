@@ -9,7 +9,8 @@ __date__ = "2020/01/29"
 
 import os
 
-FILES_IN_ROOT = {".git", ".gitignore", "src", "test", "doc", "data", "Makefile"}
+FILES_IN_ROOT = {'data', 'src', 'README.md', 'test', 'Makefile', 'python_utils', '.gitignore',
+                 'run.sh', 'multiscale_bci_python', '.gitmodules'}
 
 
 class Makefile:

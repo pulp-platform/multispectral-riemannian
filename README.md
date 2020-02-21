@@ -10,11 +10,9 @@ First, get all the submodules
 git submodule update --init --recursive
 ```
 
-Then, make sure to setup the virtual environment properly
+Install the necessary python modules
 
 ```
-python -m virtualenv multiscale_bci_python/env
-source multiscale_bci_python/env/bin/activate
 pip install numpy scipy sklearn pyriemann matplotlib tqdm cffi
 ```
 

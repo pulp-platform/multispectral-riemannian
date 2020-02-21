@@ -25,24 +25,24 @@ while getopts "bp:nwth" name; do
 done
 
 # search for a virtual environment
-if [ -e multiscale_bci_python/env/bin/activate ]; then
-    printf "activating multiscale_bci_python/env\n"
-    source multiscale_bci_python/env/bin/activate
-elif [ -e multiscale_bci_python/venv/bin/activate ]; then
-    printf "activating multiscale_bci_python/venv\n"
-    source multiscale_bci_python/env/bin/activate
-elif [ -e multiscale_bci_python/virtualenv/bin/activate ]; then
-    printf "activating multiscale_bci_python/virtualenv\n"
-    source multiscale_bci_python/env/bin/activate
-else
-    read -s "Please enter the path to a virtual environment (including /bin/activate)\n> " VIRTUAL_ENVIRONMENT_PATH
-    if [ -e $VIRTUAL_ENVIRONMENT_PATH ]; then
-        source $VIRTUAL_ENVIRONMENT_PATH
-    else
-        printf "Virtual environment could not be found!"
-        exit 1
-    fi
-fi
+# if [ -e multiscale_bci_python/env/bin/activate ]; then
+#     printf "activating multiscale_bci_python/env\n"
+#     source multiscale_bci_python/env/bin/activate
+# elif [ -e multiscale_bci_python/venv/bin/activate ]; then
+#     printf "activating multiscale_bci_python/venv\n"
+#     source multiscale_bci_python/env/bin/activate
+# elif [ -e multiscale_bci_python/virtualenv/bin/activate ]; then
+#     printf "activating multiscale_bci_python/virtualenv\n"
+#     source multiscale_bci_python/env/bin/activate
+# else
+#     read -s "Please enter the path to a virtual environment (including /bin/activate)\n> " VIRTUAL_ENVIRONMENT_PATH
+#     if [ -e $VIRTUAL_ENVIRONMENT_PATH ]; then
+#         source $VIRTUAL_ENVIRONMENT_PATH
+#     else
+#         printf "Virtual environment could not be found!"
+#         exit 1
+#     fi
+# fi
 
 
 if [ "$TRAIN" = true ]; then
@@ -52,7 +52,7 @@ if [ "$TRAIN" = true ]; then
     cd multiscale_bci_python
 
     # train the network (for one subject only) and export the data to the ../data directory
-    python main_riemannian.py -e -f ../data
+    python3.8 main_riemannian.py -e -f ../data
 
     # go back to the root hdirectory
     cd ..
@@ -70,15 +70,14 @@ cd data
 export PYTHONPATH=$(pwd)/python_utils:$(pwd)/multiscale_bci_python:$PYTHONPATH
 
 # generate net header file
-# python gen_net_header.py
-# python gen_input_header.py
+# python3 gen_net_header.py
+# python3 gen_input_header.py
 
 # leave data directory
 cd ..
 
 # deactivate the virtual environment and reset the pythonpath
-deactivate
-
+# deactivate
 
 # build everything
 make clean all

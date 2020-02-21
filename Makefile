@@ -5,6 +5,7 @@ PULP_APP_FC_SRCS = \
 
 PULP_APP_CL_SRCS = \
     src/cl/cluster.c \
+	src/cl/func/sos_filt.c \
 
 PULP_CFLAGS = -O3 -g -DROUND
 

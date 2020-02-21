@@ -8,11 +8,14 @@ import numpy as np
 import pickle
 from functools import reduce
 import operator
+from collections import OrderedDict
 
 from functional import quantize, quantize_to_int, dequantize, quantize_iir_filter
 from functional import prepare_bitshift, apply_bitshift_scale, solve_for_scale, solve_for_scale_sqr
 from sos_filt import quant_sos_filt_df1
 from svd import logm
+from header_file import HeaderFile, HeaderConstant, HeaderArray, HeaderScalar, HeaderComment, \
+    HeaderStruct
 
 __author__ = 'Tibor Schneider'
 __email__ = 'sctibor@ethz.ch'
@@ -26,7 +29,7 @@ class GoldenModel:
     '''
     Fix-Point model for the multiscale riemannian classifier
     '''
-    def __init__(self, model_filename):
+    def __init__(self, model_filename: str) -> None:
         ''' Initialize the RiemannianItegerModel
 
         Parameters
@@ -64,7 +67,7 @@ class GoldenModel:
         self.output_scale = self.svm.output_scale
         self.output_n_bits = self.svm.output_n_bits
 
-    def prepare_input(self, x):
+    def prepare_input(self, x: np.ndarray) -> np.ndarray:
         ''' quantizes the input and uses the correct time window '''
         assert x.dtype in [np.float32, np.float64]
 
@@ -80,10 +83,10 @@ class GoldenModel:
         assert x.dtype == np.int
         return x
 
-    def __call__(self, x):
+    def __call__(self, x: np.ndarray) -> np.ndarray:
         return self.apply(x)
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         ''' Do the inference '''
         assert x.shape == self.input_shape
         assert x.dtype == np.int
@@ -95,11 +98,11 @@ class GoldenModel:
         assert y.dtype == np.int
         return y
 
-    def dequantize_output(self, y):
+    def dequantize_output(self, y: np.ndarray) -> np.ndarray:
         ''' Dequantize the output from the inference '''
         return dequantize(y, self.output_scale, self.output_n_bits)
 
-    def apply_float(self, x):
+    def apply_float(self, x: np.ndarray) -> np.ndarray:
         ''' apply the inference, where input and output are in floating point represenation '''
         x_quant = self.prepare_input(x)
         y_quant = self.apply(x_quant)
@@ -109,7 +112,7 @@ class GoldenModel:
 
 class Block():
     ''' Abstract class for a single block '''
-    def __init__(self, model_dict):
+    def __init__(self, model_dict: dict) -> None:
         self.input_shape = None
         self.output_shape = None
         self.input_scale = 1
@@ -120,16 +123,21 @@ class Block():
         self.T = temp_window[1] - temp_window[0]
         self.C = 22
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
+        """ apply the function of the block to some input """
         raise NotImplementedError()
 
-    def __call__(self, x):
+    def __call__(self, x: np.ndarray) -> np.ndarray:
         return self.apply(x)
+
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
 
 
 class SVM(Block):
     ''' SVM block '''
-    def __init__(self, model_dict):
+    def __init__(self, model_dict: dict) -> None:
         super(SVM, self).__init__(model_dict)
 
         # compute the input shape
@@ -157,7 +165,7 @@ class SVM(Block):
         self.bias = model_dict['SVM']['bias']
         self.bias = quantize_to_int(self.bias, self.bias_scale, self.bias_n_bits, True)
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -168,10 +176,14 @@ class SVM(Block):
         assert all([-(1 << 31) <= t < (1 << 31) for t in y])
         return y
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class FeatureExtraction(Block):
     ''' Block containing the entire feature extraction '''
-    def __init__(self, model_dict):
+    def __init__(self, model_dict: dict) -> None:
         super(FeatureExtraction, self).__init__(model_dict)
 
         self.n_freq = len(model_dict['riemannian']['filter_bank'])
@@ -186,7 +198,7 @@ class FeatureExtraction(Block):
         self.output_scale = self.freq_band[0].output_scale
         self.output_n_bits = self.freq_band[0].output_n_bits
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -196,10 +208,14 @@ class FeatureExtraction(Block):
         assert y.dtype == np.int
         return y
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class RiemannianFeature(Block):
     ''' Block containing feature preparation for a single frequency band '''
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(RiemannianFeature, self).__init__(model_dict)
         self.freq_idx = freq_idx
 
@@ -216,7 +232,7 @@ class RiemannianFeature(Block):
         self.output_scale = self.half_diag.output_scale
         self.output_n_bits = self.half_diag.output_n_bits
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         x = self.filter(x)
         x = self.cov_mat(x)
         x = self.whitening(x)
@@ -224,10 +240,14 @@ class RiemannianFeature(Block):
         x = self.half_diag(x)
         return x
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class Filter(Block):
     ''' IIR filter block '''
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(Filter, self).__init__(model_dict)
         self.freq_idx = freq_idx
         self.input_shape = (self.C, self.T)
@@ -239,7 +259,7 @@ class Filter(Block):
         prep_filter = quantize_iir_filter(quant_filter, filter_n_bits)
         self.coeff_a, self.shift_a, self.coeff_b, self.shift_b, self.shift_y = prep_filter
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -261,10 +281,37 @@ class Filter(Block):
 
         return y
 
+    def add_header_entries(self,
+                           header_file: HeaderFile,
+                           base_name: str,
+                           is_full_name: bool = False) -> None:
+        """ Adds necessary header entries to the file """
+        if is_full_name:
+            name = base_name
+        else:
+            name = f"{base_name}_filter_{self.freq_idx}"
+        # First, add a comment
+        header_file.add(HeaderComment(f"Filter Coefficients for frequency id: {self.freq_idx}",
+                                      mode="/*"))
+        # add the struct
+        struct = OrderedDict()
+        struct['a01'] = f"((v2s){{ {self.coeff_a[1, 1]}, {self.coeff_a[1, 2]} }})"
+        struct['a11'] = f"((v2s){{ {self.coeff_a[2, 1]}, {self.coeff_a[2, 2]} }})"
+        struct['b00'] = f"{self.coeff_b[1, 0]}"
+        struct['b01'] = f"((v2s){{ {self.coeff_b[1, 1]}, {self.coeff_b[1, 2]} }})"
+        struct['b10'] = f"{self.coeff_b[2, 0]}"
+        struct['b11'] = f"((v2s){{ {self.coeff_b[2, 1]}, {self.coeff_b[2, 2]} }})"
+        struct['shift_a0'] = f"{self.shift_a[1]}"
+        struct['shift_a1'] = f"{self.shift_a[2]}"
+        struct['shift_b0'] = f"{self.shift_b[1]}"
+        struct['shift_b1'] = f"{self.shift_b[2]}"
+        struct['y_shift'] = f"{-self.shift_y}"
+        header_file.add(HeaderStruct(name, "func_sos_filt_2S_params_t", struct))
+
 
 class CovMat(Block):
     ''' Covariance Matrix Block '''
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(CovMat, self).__init__(model_dict)
         self.freq_idx = freq_idx
         self.input_shape = (self.C, self.T)
@@ -286,7 +333,7 @@ class CovMat(Block):
                                                self.input_scale, self.input_n_bits,
                                                self.output_scale, self.output_n_bits)
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -299,10 +346,14 @@ class CovMat(Block):
         assert y.dtype == np.int
         return y
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class Whitening(Block):
     ''' Whitening Block '''
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(Whitening, self).__init__(model_dict)
         self.freq_idx = freq_idx
         self.input_shape = (self.C, self.C)
@@ -328,7 +379,7 @@ class Whitening(Block):
         self.ref_invsqrtm = quantize_to_int(c_ref_invsqrtm, self.ref_invsqrtm_scale,
                                             self.ref_invsqrtm_n_bits)
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -342,10 +393,14 @@ class Whitening(Block):
         assert y.dtype == np.int
         return y
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class Logm(Block):
     """ Applies matrix logarithm """
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(Logm, self).__init__(model_dict)
         self.freq_idx = freq_idx
         self.input_shape = (self.C, self.C)
@@ -362,7 +417,7 @@ class Logm(Block):
         # self.output_n_bits = 8 # set by default
         self.output_scale = model_dict['riemannian']['logm_out_scale']
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -374,10 +429,14 @@ class Logm(Block):
         assert y.dtype == np.int
         return y
 
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()
+
 
 class HalfDiag(Block):
     """ Applies half-diagonalization """
-    def __init__(self, model_dict, freq_idx):
+    def __init__(self, model_dict: dict, freq_idx: int) -> None:
         super(HalfDiag, self).__init__(model_dict)
         self.freq_idx = freq_idx
         self.input_shape = (self.C, self.C)
@@ -402,7 +461,7 @@ class HalfDiag(Block):
 
         self.sqrt2 = quantize_to_int(np.sqrt(2), sqrt2_scale, sqrt2_n_bits)
 
-    def apply(self, x):
+    def apply(self, x: np.ndarray) -> np.ndarray:
         assert x.shape == self.input_shape
         assert x.dtype == np.int
 
@@ -423,3 +482,7 @@ class HalfDiag(Block):
         assert y.shape == self.output_shape
         assert y.dtype == np.int
         return y
+
+    def add_header_entries(self, header_file: HeaderFile, base_name: str) -> None:
+        """ Adds necessary header entries to the file """
+        raise NotImplementedError()

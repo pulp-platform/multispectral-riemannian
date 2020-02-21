@@ -11,9 +11,11 @@ import os
 import re
 from textwrap import wrap
 import numpy as np
+from collections import OrderedDict
 
 MAX_WIDTH = 100
 TAB = "    "
+
 
 class HeaderFile():
     """
@@ -73,6 +75,39 @@ class HeaderEntry():
         return ""
 
 
+class HeaderStruct(HeaderEntry):
+    """ Adds a struct to the header (and source) file """
+    def __init__(self, name, struct_type, data, blank_line=True):
+        assert isinstance(data, (dict, OrderedDict))
+        self.name = name
+        self.struct_type = struct_type
+        self.data = data
+        self.blank_line = blank_line
+
+    def header_str(self, with_c=False):
+        if with_c:
+            ret = "extern const {} {};\n".format(self.struct_type, self.name)
+            if self.blank_line:
+                ret += "\n"
+        else:
+            ret = self.source_str()
+        return ret
+
+    def source_str(self):
+        # first, compute the length of the longest value
+        max_len = max([len(str(v)) for v in self.data.values()])
+        max_len += 1
+
+        ret = "const {} {} = {{\n".format(self.struct_type, self.name)
+        for key, value in self.data.items():
+            val_colon = "{},".format(value).ljust(max_len, ' ')
+            ret += "{}{} //{}\n".format(TAB, val_colon, key)
+        ret += "};\n"
+        if self.blank_line:
+            ret += "\n"
+        return ret
+
+
 class HeaderConstant(HeaderEntry):
     def __init__(self, name, value, blank_line=True):
         self.name = name
@@ -81,6 +116,21 @@ class HeaderConstant(HeaderEntry):
 
     def header_str(self, with_c=False):
         ret = "#define {} {}\n".format(self.name, self.value)
+        if self.blank_line:
+            ret += "\n"
+        return ret
+
+    def source_str(self):
+        return ""
+
+
+class HeaderInclude(HeaderEntry):
+    def __init__(self, name, blank_line=True):
+        self.name = name
+        self.blank_line = blank_line
+
+    def header_str(self, with_c=False):
+        ret = "#include \"{}\"\n".format(self.name)
         if self.blank_line:
             ret += "\n"
         return ret
