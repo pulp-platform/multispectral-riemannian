@@ -37,17 +37,16 @@ int quant_sos_filt_df1(const int64_t* x,
             regs[m][1] = regs[m][0];
 
             int64_t acc = 0;
-            int64_t tmp = 0;
-            tmp = (regs[m - 1][0] * b[m * 3 + 0]);
-            tmp += (regs[m - 1][1] * b[m * 3 + 1]);
-            tmp += (regs[m - 1][2] * b[m * 3 + 2]);
-            //acc = (tmp + (1 << (b_shift[m] - 1))) >> b_shift[m];
-            acc = tmp >> b_shift[m];
+            int64_t _b_shift = b_shift[m] - a_shift[m];
 
-            tmp = (regs[m][1] * a[m * 3 + 1]);
-            tmp += (regs[m][2] * a[m * 3 + 2]);
-            //acc -= (tmp + (1 << (a_shift[m] - 1))) >> a_shift[m];
-            acc -= tmp >> a_shift[m];
+            acc = (regs[m - 1][0] * b[m * 3 + 0]);
+            acc += (regs[m - 1][1] * b[m * 3 + 1]);
+            acc += (regs[m - 1][2] * b[m * 3 + 2]);
+            acc = (acc + (1 << (_b_shift - 1))) >> _b_shift;
+
+            acc -= (regs[m][1] * a[m * 3 + 1]);
+            acc -= (regs[m][2] * a[m * 3 + 2]);
+            acc = (acc + (1 << (a_shift[m] - 1))) >> a_shift[m];
 
             // handle overflow
             if (acc < clip_range_neg || acc > clip_range_pos) {
