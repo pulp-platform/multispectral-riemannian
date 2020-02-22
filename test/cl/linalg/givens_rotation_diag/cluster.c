@@ -12,7 +12,7 @@ int do_bench(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_givens_rotation_t acq = linalg_givens_rotation(a_stm, b_stm);
+    linalg_givens_rotation_t acq = linalg_givens_rotation_diag(a_stm, b_stm, c_stm);
 
     rt_perf_stop(perf);
 

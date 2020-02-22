@@ -12,13 +12,16 @@ int do_bench(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_givens_rotation_t acq = linalg_givens_rotation(a_stm, b_stm);
+    linalg_evd_2x2_t acq = linalg_evd_2x2(a_stm, b_stm, c_stm);
 
     rt_perf_stop(perf);
 
     if (fabs(cs_exp - acq.cs) > EPSILON
-        || fabs(sn_exp - acq.sn) > EPSILON) {
+        || fabs(sn_exp - acq.sn) > EPSILON
+        || fabs(ev1_exp - acq.ev1) > EPSILON
+        || fabs(ev2_exp - acq.ev2) > EPSILON) {
         printf("cs diff: %.2e, sn diff: %.2e\n", fabs(cs_exp - acq.cs), fabs(sn_exp - acq.sn));
+        printf("ev1 diff: %.2e, ev2 diff: %.2e\n", fabs(ev1_exp - acq.ev1), fabs(ev2_exp - acq.ev2));
         return 1;
     }
 

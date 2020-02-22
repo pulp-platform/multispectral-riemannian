@@ -143,6 +143,19 @@ inline float insn_fsqrt(float a) {
 }
 
 /**
+ * @brief calls fabs.s, (probably) 1 cycle latency
+ * @param a float
+ * @returns |a|
+ */
+inline float insn_fabs(float a) {
+    float y;
+    asm ("fabs.s %[y],%[a];"
+         : [y] "=f" (y)
+         : [a] "f" (a));
+    return y;
+}
+
+/**
  * @brief calls fsgnj.s, 1 cycle latency
  * @param a float
  * @param b float

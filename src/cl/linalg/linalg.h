@@ -23,8 +23,8 @@ typedef struct {
 /**
  * @brief Computes the givens rotation coefficients cosine and sine
  *
- * | c -s | | a | = | r |
- * | s  c | | b | = | 0 |
+ * | cs -sn | | a | = | r |
+ * | sn  cs | | b | = | 0 |
  *
  * @param a first value
  * @param b second value
@@ -32,5 +32,51 @@ typedef struct {
  */
 linalg_givens_rotation_t linalg_givens_rotation(float a,
                                                 float b);
+
+/**
+ * @brief computes the rotation of the EVD of a 2x2 symmetric matrix
+ *
+ * | cs -sn | | a  b | | cs -sn |^T = | ev1  0 |
+ * | sn  cs | | b  c | | sn  cs |  =  | 0  ev2 |
+ *
+ * @warning The sine is defined differently than in linalg_evd_2x2
+ *
+ * @param a first element in the main-diagonal
+ * @param b element in the off-diagonal
+ * @param c second element in the main-diagonal
+ * @returns linalg_evd_2x2_t structure
+ */
+linalg_givens_rotation_t linalg_givens_rotation_diag(float a,
+                                                     float b,
+                                                     float c);
+
+/**
+ * @struct linalg_evd_2x2_t
+ * @brief structure containing both the rotation and the eigenvalues of a 2x2 symmetric matrix.
+ *
+ * @var linalg_evd_2x2_t::cs cosine for the rotation
+ * @var linalg_evd_2x2_t::cs sine for the rotation
+ */
+typedef struct {
+    float ev1;
+    float ev2;
+    float cs;
+    float sn;
+} linalg_evd_2x2_t;
+
+/**
+ * @brief Computes the eigenvalue decomposition of a 2x2 symmetri matrix (lapack: SLAEV2)
+ *
+ * | cs -sn |^T | a  b | | cs -sn | = | ev1  0 |
+ * | sn  cs |   | b  c | | sn  cs | = | 0  ev2 |
+ *
+ * @param a first element in the main-diagonal
+ * @param b element in the off-diagonal
+ * @param c second element in the main-diagonal
+ * @returns linalg_evd_2x2_t structure
+ */
+linalg_evd_2x2_t linalg_evd_2x2(float a,
+                                float b,
+                                float c);
 
 #endif //__CL_LINALG_H__
