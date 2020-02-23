@@ -12,19 +12,17 @@ from functional import float_as_int_repr, float_from_int_repr
 TESTNAME = "FPU of Mr Wolf"
 RESULT_FILE = "result.out"
 
+NUM_TEST = 100
+
 
 def gen_stimuli():
     """
     This function generates the stimuli (taken from actual data)
     """
-    x = np.random.randn(9).astype(np.float32)
-    x[8] = np.abs(x[8])
-    y = np.array([x[0] + x[1],
-                  x[2] - x[3],
-                  x[4] * x[5],
-                  x[6] / x[7],
-                  np.sqrt(x[8])])
-    return x, y
+    a = np.random.randn(NUM_TEST).astype(np.float32)
+    b = np.random.randn(NUM_TEST).astype(np.float32)
+    c = np.abs(np.random.randn(NUM_TEST)).astype(np.float32)
+    return a, b, c
 
 
 def float_formatter(x):
@@ -33,17 +31,23 @@ def float_formatter(x):
 
 
 def compare_result(result, case_name, exp, rel_tol=0):
-    acq_str = result[case_name]["res"]
-    acq = float_from_int_repr(int(acq_str, 16))
-    exp_d = np.float64(exp)
-    acq_d = np.float64(acq)
-    abs_diff = np.abs(acq_d - exp_d)
-    rel_diff = abs_diff / np.abs(exp_d)
-    success = rel_diff <= rel_tol
-    result[case_name]["abs_diff"] = "{:.2e}".format(abs_diff)
-    result[case_name]["rel_diff"] = "{:.2e}".format(rel_diff)
+    max_rel_diff = 0
+    mean_rel_diff = 0
+    for i in range(NUM_TEST):
+        acq_str = result[case_name][str(i)]
+        acq = float_from_int_repr(int(acq_str, 16))
+        exp_d = np.float64(exp[i])
+        acq_d = np.float64(acq)
+        abs_diff = np.abs(acq_d - exp_d)
+        rel_diff = abs_diff / np.abs(exp_d)
+        max_rel_diff = max(max_rel_diff, rel_diff)
+        mean_rel_diff += rel_diff / NUM_TEST
+        del result[case_name][str(i)]
+
+    success = max_rel_diff <= rel_tol
+    result[case_name]["mean_rel_diff"] = "{:.2e}".format(mean_rel_diff)
+    result[case_name]["max_rel_diff"] = "{:.2e}".format(max_rel_diff)
     result[case_name]["result"] = success
-    del result[case_name]["res"]
 
 
 def test():
@@ -62,12 +66,15 @@ def test():
     mkf.write()
 
     # generate the stimuli
-    x, y_exp = gen_stimuli()
+    a, b, c = gen_stimuli()
 
     # prepare header file
     header = HeaderFile("test_stimuli.h")
     # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-    header.add(HeaderArray("stm", "uint32_t", x.ravel(), formatter=float_formatter))
+    header.add(HeaderArray("a_stm", "uint32_t", a.ravel(), formatter=float_formatter))
+    header.add(HeaderArray("b_stm", "uint32_t", b.ravel(), formatter=float_formatter))
+    header.add(HeaderArray("c_stm", "uint32_t", c.ravel(), formatter=float_formatter))
+    header.add(HeaderConstant("LENGTH", NUM_TEST))
     header.write()
 
     # compile and run
@@ -77,11 +84,15 @@ def test():
     result = parse_output(RESULT_FILE)
 
     # read the results out
-    compare_result(result, "add", y_exp[0])
-    compare_result(result, "sub", y_exp[1])
-    compare_result(result, "mul", y_exp[2])
-    compare_result(result, "div", y_exp[3])
-    compare_result(result, "sqrt", y_exp[4])
+    compare_result(result, "add", a + b)
+    compare_result(result, "sub", a - b)
+    compare_result(result, "mul", a * b)
+    compare_result(result, "div", a / b)
+    compare_result(result, "sqrt", np.sqrt(c))
+    compare_result(result, "madd", (a * b) + c)
+    compare_result(result, "msub", (a * b) - c)
+    compare_result(result, "nmadd", -((a * b) + c))
+    compare_result(result, "nmsub", -((a * b) - c))
 
     # log the result
     logger.show_subcase_result("FPU", result)
