@@ -8,6 +8,24 @@ __version__ = "0.1.0"
 __date__ = "2020/01/23"
 
 import numpy as np
+import cffi
+import os
+
+FFI_HDR = """
+    uint32_t float_as_int_repr(float x);
+    float float_from_int_repr(uint32_t x);
+"""
+FFI_LIB = "float_as_int_repr.so"
+
+def init_cffi_lib():
+    ffi = cffi.FFI()
+    ffi.cdef(FFI_HDR)
+    path = os.path.dirname(os.path.abspath(__file__))
+    lib_file = os.path.join(path, FFI_LIB)
+    lib = ffi.dlopen(lib_file)
+    return ffi, lib
+
+FFI, LIB = init_cffi_lib()
 
 
 def quantize(x, scale_factor, n_bits=8, do_round=True):
@@ -243,3 +261,25 @@ def apply_bitshift_scale(x, bitshift, do_round=True):
     x = x >> bitshift
 
     return x
+
+
+def float_as_int_repr(x):
+    """ Returns an integer with the bitrepresentation of the float
+
+    Parameters:
+    - x: float
+
+    Returns: integer representation of x
+    """
+    return LIB.float_as_int_repr(FFI.cast("float", x))
+
+
+def float_from_int_repr(x):
+    """ Returns an integer with the bitrepresentation of the float
+
+    Parameters:
+    - x: unsigned int
+
+    Returns: float as represented in x
+    """
+    return LIB.float_from_int_repr(FFI.cast("uint32_t", x))

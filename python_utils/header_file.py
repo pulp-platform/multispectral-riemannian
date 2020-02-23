@@ -164,7 +164,8 @@ class HeaderScalar(HeaderEntry):
 
 
 class HeaderArray(HeaderEntry):
-    def __init__(self, name, dtype, data, locality="RT_L2_DATA", blank_line=True, const=True):
+    def __init__(self, name, dtype, data, locality="RT_L2_DATA", blank_line=True, const=True,
+                 formatter=str):
         assert locality in ["RT_LOCAL_DATA", "RT_L2_DATA", "RT_CL_DATA", "RT_FC_SHARED_DATA",
                             "RT_FC_GLOBAL_DATA", ""]
         self.name = name
@@ -173,6 +174,7 @@ class HeaderArray(HeaderEntry):
         self.locality = locality
         self.const = const
         self.blank_line = blank_line
+        self.formatter = formatter
 
     def header_str(self, with_c=False):
         const_str = "const " if self.const else ""
@@ -182,7 +184,7 @@ class HeaderArray(HeaderEntry):
             # first, try it as a one-liner (only if the length is smaller than 16)
             if len(self.data) <= 16:
                 ret = "{} {}{} {}[] = {{ {} }};".format(self.locality, const_str, self.dtype, self.name,
-                                                      ", ".join([str(item) for item in self.data]))
+                                                        ", ".join([self.formatter(item) for item in self.data]))
                 if len(ret) <= MAX_WIDTH:
                     ret += "\n"
                     if self.blank_line:
@@ -193,7 +195,7 @@ class HeaderArray(HeaderEntry):
             ret = ""
             ret += "{} {}{} {}[] = {{\n".format(self.locality, const_str, self.dtype, self.name)
 
-            long_str = ", ".join([str(item) for item in self.data])
+            long_str = ", ".join([self.formatter(item) for item in self.data])
             parts = wrap(long_str, MAX_WIDTH-len(TAB))
             ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
 
@@ -208,7 +210,7 @@ class HeaderArray(HeaderEntry):
         # first, try it as a one-liner
         if len(self.data) <= 16:
             ret = "{} {}{} {}[] = {{ {} }};".format(self.locality, const_str, self.dtype, self.name,
-                                                    ", ".join([str(item) for item in self.data]))
+                                                    ", ".join([self.formatter(item) for item in self.data]))
             if len(ret) <= MAX_WIDTH:
                 ret += "\n"
                 if self.blank_line:
@@ -219,7 +221,7 @@ class HeaderArray(HeaderEntry):
         ret = ""
         ret += "{} {}{} {}[] = {{\n".format(self.locality, const_str, self.dtype, self.name)
 
-        long_str = ", ".join([str(item) for item in self.data])
+        long_str = ", ".join([self.formatter(item) for item in self.data])
         parts = wrap(long_str, MAX_WIDTH-len(TAB))
         ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
 

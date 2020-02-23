@@ -63,6 +63,11 @@ printf "Running EEGnet on Platform: %s\n\n" $PLATFORM
 # set the platform
 PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
 
+# build python utils
+cd python_utils
+make
+cd ..
+
 # enter data directory
 cd data
 
