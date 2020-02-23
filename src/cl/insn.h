@@ -22,7 +22,7 @@
 inline float insn_fadd(float a, float b) {
     float y;
     asm ("fadd.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -36,7 +36,7 @@ inline float insn_fadd(float a, float b) {
 inline float insn_fsub(float a, float b) {
     float y;
     asm ("fsub.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -50,7 +50,7 @@ inline float insn_fsub(float a, float b) {
 inline float insn_fmul(float a, float b) {
     float y;
     asm ("fmul.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -64,7 +64,7 @@ inline float insn_fmul(float a, float b) {
 inline float insn_fdiv(float a, float b) {
     float y;
     asm ("fdiv.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -79,7 +79,7 @@ inline float insn_fdiv(float a, float b) {
 inline float insn_fmadd(float a, float b, float c) {
     float y;
     asm ("fmadd.s %[y],%[a],%[b],%[c];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
 }
@@ -94,7 +94,7 @@ inline float insn_fmadd(float a, float b, float c) {
 inline float insn_fmsub(float a, float b, float c) {
     float y;
     asm ("fmsub.s %[y],%[a],%[b],%[c];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
 }
@@ -109,7 +109,7 @@ inline float insn_fmsub(float a, float b, float c) {
 inline float insn_fnmadd(float a, float b, float c) {
     float y;
     asm ("fnmadd.s %[y],%[a],%[b],%[c];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
 }
@@ -124,7 +124,7 @@ inline float insn_fnmadd(float a, float b, float c) {
 inline float insn_fnmsub(float a, float b, float c) {
     float y;
     asm ("fnmsub.s %[y],%[a],%[b],%[c];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
 }
@@ -137,7 +137,7 @@ inline float insn_fnmsub(float a, float b, float c) {
 inline float insn_fsqrt(float a) {
     float y;
     asm ("fsqrt.s %[y],%[a];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a));
     return y;
 }
@@ -150,7 +150,7 @@ inline float insn_fsqrt(float a) {
 inline float insn_fabs(float a) {
     float y;
     asm ("fabs.s %[y],%[a];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a));
     return y;
 }
@@ -164,7 +164,7 @@ inline float insn_fabs(float a) {
 inline float insn_fsgnj(float a, float b) {
     float y;
     asm ("fsgnj.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -178,7 +178,7 @@ inline float insn_fsgnj(float a, float b) {
 inline float insn_fsgnjn(float a, float b) {
     float y;
     asm ("fsgnjn.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -192,7 +192,7 @@ inline float insn_fsgnjn(float a, float b) {
 inline float insn_fsgnjx(float a, float b) {
     float y;
     asm ("fsgnjx.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -206,7 +206,7 @@ inline float insn_fsgnjx(float a, float b) {
 inline float insn_fmax(float a, float b) {
     float y;
     asm ("fmax.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
@@ -220,7 +220,7 @@ inline float insn_fmax(float a, float b) {
 inline float insn_fmin(float a, float b) {
     float y;
     asm ("fmin.s %[y],%[a],%[b];"
-         : [y] "=f" (y)
+         : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b));
     return y;
 }
