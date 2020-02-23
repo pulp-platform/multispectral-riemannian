@@ -3,6 +3,15 @@
 #include "../../../../src/cl/linalg/linalg.h"
 #include "test_stimuli.h"
 #include "math.h"
+#include "../../../../src/cl/insn.h"
+
+float abs_diff(float exp, float acq) {
+    if (exp == acq) {
+        return 0.f;
+    }
+    float abs_diff = fabs(exp - acq);
+    return abs_diff;
+}
 
 int do_bench(rt_perf_t* perf, int events) {
     //setup performance measurement
@@ -16,9 +25,11 @@ int do_bench(rt_perf_t* perf, int events) {
 
     rt_perf_stop(perf);
 
-    if (fabs(cs_exp - acq.cs) > EPSILON
-        || fabs(sn_exp - acq.sn) > EPSILON) {
-        printf("cs diff: %.2e, sn diff: %.2e\n", fabs(cs_exp - acq.cs), fabs(sn_exp - acq.sn));
+    float max_abs_diff = insn_fmax(abs_diff(cs_exp, acq.cs), abs_diff(sn_exp, acq.sn));
+
+    printf("## 1: abs_err: %.2e\n", max_abs_diff);
+
+    if (max_abs_diff > EPSILON) {
         return 1;
     }
 

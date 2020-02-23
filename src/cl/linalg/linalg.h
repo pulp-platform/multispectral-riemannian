@@ -79,4 +79,24 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
                                 float b,
                                 float c);
 
+
+/**
+ * @brief Compute the matrix multiplication of two floating point matrices
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to matrix B of shape [N, O]
+ * @param M Rows of matrix A and Y
+ * @param N Rows of matrix B and columns of matrix A
+ * @param O Columns of matrix B and Y
+ * @param p_y Pointer to matrix Y = AB of shape [M, O]
+ */
+void linalg_matmul_f(const float* p_a,
+                     const float* p_b,
+                     unsigned int M,
+                     unsigned int N,
+                     unsigned int O,
+                     float* p_y);
+
 #endif //__CL_LINALG_H__

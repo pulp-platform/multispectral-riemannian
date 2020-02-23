@@ -57,7 +57,7 @@ def test():
         header.add(HeaderScalar("b_stm", "float", b))
         header.add(HeaderScalar("cs_exp", "float", cs))
         header.add(HeaderScalar("sn_exp", "float", sn))
-        header.add(HeaderConstant("EPSILON", "5.0e-7"))
+        header.add(HeaderConstant("EPSILON", "1.0e-35f"))
         header.write()
 
         # compile and run
