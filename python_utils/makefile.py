@@ -15,11 +15,13 @@ FILES_IN_ROOT = {'data', 'src', 'README.md', 'test', 'Makefile', 'python_utils',
 
 class Makefile:
     """ Makefile generation """
-    def __init__(self, project_root=None, use_dsp=True):
+    def __init__(self, project_root=None, use_dsp=True, use_fma=None, use_sqrtdiv=None):
         self.fc_sources = []
         self.cl_sources = []
         self.defines = []
         self.use_dsp = use_dsp
+        self.use_fma = use_fma
+        self.use_sqrtdiv = use_sqrtdiv
         self.project_root = project_root
         if self.project_root is None:
             # search the project root
@@ -33,6 +35,12 @@ class Makefile:
         else:
             current_files = set(os.listdir(self.project_root))
             assert FILES_IN_ROOT <= current_files
+
+        # if use_fma or use_sqrt_div are not set, get the environmental variables
+        if self.use_fma is None:
+            self.use_fma = os.environ["WOLFTEST_USE_FMA"] == "true"
+        if self.use_sqrtdiv is None:
+            self.use_sqrtdiv = os.environ["WOLFTEST_USE_SQRTDIV"] == "true"
 
     def add_fc_test_source(self, name):
         """ add test source file, located in current directory """
@@ -67,7 +75,7 @@ class Makefile:
     def __str__(self):
         ret = ""
         ret += "PULP_APP = test\n\n"
-        
+
         # add cl sources
         if self.cl_sources:
             ret += "PULP_APP_CL_SRCS = \\\n"
@@ -83,7 +91,20 @@ class Makefile:
         # link dsp library
         if self.use_dsp:
             ret += "PULP_LDFLAGS += -lplpdsp\n"
+
         ret += "PULP_CFLAGS = -O3 -g \n\n"
+
+        # Enable FMA
+        if self.use_fma:
+            ret += "# Enable Fused FMA\n"
+            ret += "PULP_CFLAGS += -DUSE_FUSED_FPU\n\n"
+
+        # Disable div sqrt
+        if not self.use_sqrtdiv:
+            ret += "# Disable SQRT/DIV unit\n"
+            ret += "PULP_CFLAGS += -DUSE_SOFT_SQRTDIV\n"
+            ret += "PULP_CFLAGS += -mno-fdiv\n"
+            ret += "PULP_LDFLAGS += -lm\n\n"
 
         # add compiler flags
         ret += "\n".join(["PULP_CFLAGS += -D{}".format(define) for define in self.defines])

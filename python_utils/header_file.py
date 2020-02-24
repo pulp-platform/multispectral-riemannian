@@ -13,7 +13,7 @@ from textwrap import wrap
 import numpy as np
 from collections import OrderedDict
 
-MAX_WIDTH = 100
+MAX_WIDTH = 80
 TAB = "    "
 
 

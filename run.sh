@@ -5,7 +5,7 @@ RUN=true
 GTKWAVE=false
 TRAIN=false
 
-while getopts "bp:nwth" name; do
+while getopts "bp:nwtfde:h" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;

@@ -8,6 +8,7 @@ __version__ = "0.1.1"
 __date__ = "2020/01/23"
 
 import numpy as np
+import os
 from collections import OrderedDict
 
 DOT_LENGTH = 40
@@ -71,6 +72,11 @@ class TestLogger:
         self.num_successful = 0
         if show_title:
             print("\n**** Test Case: {}".format(self.name))
+        self.epsilon = float(os.environ["WOLFTEST_EPSILON"])
+
+    def epsilon_str(self):
+        """ returns the epsilon as an c interpretable float string """
+        return "{:.2e}f".format(self.epsilon)
 
     def show_subcase_result(self, subcase_name, results):
         """

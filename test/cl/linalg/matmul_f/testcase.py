@@ -42,7 +42,7 @@ def test():
         mkf = Makefile()
         mkf.add_fc_test_source("test.c")
         mkf.add_cl_test_source("cluster.c")
-        mkf.add_cl_prog_source("linalg/matmul.c")
+        mkf.add_cl_prog_source("linalg/matop_f.c")
         mkf.write()
 
         # generate the stimuli
@@ -57,7 +57,7 @@ def test():
         header.add(HeaderConstant("M_DIM", M))
         header.add(HeaderConstant("N_DIM", N))
         header.add(HeaderConstant("O_DIM", O))
-        header.add(HeaderConstant("EPSILON", "1e-35f"))
+        header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
         header.write()
 
         # compile and run
