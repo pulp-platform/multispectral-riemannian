@@ -2,16 +2,25 @@
 
 PLATFORM="gvsoc"
 TRAIN=false
+export WOLFTEST_USE_FMA=true
+export WOLFTEST_USE_SQRTDIV=true
+export WOLFTEST_EPSILON=1e-35
 
-while getopts "bp:th" name; do
+while getopts "bp:tfde:h" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;
         t) TRAIN=true;;
-        h) printf "Usage: %s [-b] [-p platform] [root_folder]\n" $0
+        f) export WOLFTEST_USE_FMA=false;;
+        d) export WOLFTEST_USE_SQRTDIV=false;;
+        e) export WOLFTEST_EPSILON=$OPTARG;;
+        h) printf "Usage: %s [-b] [-p platform] [-f] [-d] [-e epsilon] [root_folder]\n" $0
            printf " -b            build on the board, equivalent to -p board\n"
            printf " -p <platform> build on the desired platform [board | gvsoc], default is gvsoc\n"
            printf " -h            show this help message\n"
+           printf " -f            do not use float fused multiply add instructions\n"
+           printf " -d            do not use float divide and square root instructions\n"
+           printf " -a  <epsilon> accuracy for all floating point tests, defaults to 1e-35\n"
            printf " root_folder   Start folder where to execute all the tests\n"
            exit 0;;
         ?) printf "Usage: %s [-b] [-p platform] root_folder\n" $0
@@ -45,7 +54,18 @@ printf "\n"
 #     fi
 # fi
 
-printf "Testing on Platform: %s\n\n" $PLATFORM
+printf "Testing on Platform: %s" $PLATFORM
+if [ "$WOLFTEST_USE_FMA" = true ]; then
+    printf " +fma"
+else
+    printf " -fma"
+fi
+if [ "$WOLFTEST_USE_SQRTDIV" = true ]; then
+    printf " +sqrtdiv"
+else
+    printf " -sqrtdiv"
+fi
+printf "\nepsilon = %s\n\n" $WOLFTEST_EPSILON
 
 ROOT=${@:$OPTIND:1}
 

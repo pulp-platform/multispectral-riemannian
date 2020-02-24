@@ -40,6 +40,7 @@ int do_bench(rt_perf_t* perf, int events) {
             float _rel_diff = rel_diff(y_exp_l1[_idx], y_acq_l1[_idx]);
             max_rel_diff = insn_fmax(max_rel_diff, _rel_diff);
             if (_rel_diff > EPSILON) {
+                // printf("error at M=%d, O=%d: diff=%.2e\n", _m, _o, _rel_diff);
                 error = 1;
             }
         }

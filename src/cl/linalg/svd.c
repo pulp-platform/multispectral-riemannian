@@ -39,7 +39,7 @@ linalg_givens_rotation_t linalg_givens_rotation(float a,
             a = a / scale;
             b = b / scale;
         }
-        float r = insn_fsqrt(a * a + b * b);
+        float r = insn_fsqrt(insn_fmadd(a, a, b * b));
         res.cs = a / r;
         res.sn = -b / r;
     }

@@ -8,6 +8,9 @@
 #ifndef __INSN_H__
 #define __INSN_H__
 
+#include "rt/rt_api.h"
+#include "math.h"
+
 /**
  * @defgroup insn_float Floating Point Instructions
  * @{
@@ -77,11 +80,15 @@ inline float insn_fdiv(float a, float b) {
  * @returns a * b + c
  */
 inline float insn_fmadd(float a, float b, float c) {
+#ifdef USE_FUSED_FPU
     float y;
     asm ("fmadd.s %[y],%[a],%[b],%[c];"
          : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
+#else //USE_FUSED_FPU
+    return insn_fadd(insn_fmul(a, b), c);
+#endif //USE_FUSED_FPU
 }
 
 /**
@@ -92,11 +99,15 @@ inline float insn_fmadd(float a, float b, float c) {
  * @returns a * b - c
  */
 inline float insn_fmsub(float a, float b, float c) {
+#ifdef USE_FUSED_FPU
     float y;
     asm ("fmsub.s %[y],%[a],%[b],%[c];"
          : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
+#else //USE_FUSED_FPU
+    return insn_fsub(insn_fmul(a, b), c);
+#endif //USE_FUSED_FPU
 }
 
 /**
@@ -107,11 +118,15 @@ inline float insn_fmsub(float a, float b, float c) {
  * @returns -(a * b + c)
  */
 inline float insn_fnmadd(float a, float b, float c) {
+#ifdef USE_FUSED_FPU
     float y;
     asm ("fnmadd.s %[y],%[a],%[b],%[c];"
          : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
+#else //USE_FUSED_FPU
+    return -insn_fadd(insn_fmul(a, b), c);
+#endif //USE_FUSED_FPU
 }
 
 /**
@@ -122,11 +137,15 @@ inline float insn_fnmadd(float a, float b, float c) {
  * @returns -(a * b - c)
  */
 inline float insn_fnmsub(float a, float b, float c) {
+#ifdef USE_FUSED_FPU
     float y;
     asm ("fnmsub.s %[y],%[a],%[b],%[c];"
          : [y] "=&f" (y)
          : [a] "f" (a), [b] "f" (b), [c] "f" (c));
     return y;
+#else //USE_FUSED_FPU
+    return -insn_fsub(insn_fmul(a, b), c);
+#endif //USE_FUSED_FPU
 }
 
 /**
@@ -135,11 +154,15 @@ inline float insn_fnmsub(float a, float b, float c) {
  * @returns sqrt(a)
  */
 inline float insn_fsqrt(float a) {
+#ifdef USE_SOFT_SQRTDIV
+    return sqrtf(a);
+#else //USE_SOFT_SQRTDIV
     float y;
     asm ("fsqrt.s %[y],%[a];"
          : [y] "=&f" (y)
          : [a] "f" (a));
     return y;
+#endif //USE_SOFT_SQRTDIV
 }
 
 /**

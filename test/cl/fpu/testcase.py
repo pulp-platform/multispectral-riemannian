@@ -12,7 +12,7 @@ from functional import float_as_int_repr, float_from_int_repr
 TESTNAME = "FPU of Mr Wolf"
 RESULT_FILE = "result.out"
 
-NUM_TEST = 100
+NUM_TEST = 10
 
 
 def gen_stimuli():
@@ -62,7 +62,6 @@ def test():
     mkf = Makefile()
     mkf.add_fc_test_source("test.c")
     mkf.add_cl_test_source("cluster.c")
-    mkf.add_cl_prog_source("linalg/matmul.c")
     mkf.write()
 
     # generate the stimuli
@@ -84,18 +83,20 @@ def test():
     result = parse_output(RESULT_FILE)
 
     # read the results out
-    compare_result(result, "add", a + b)
-    compare_result(result, "sub", a - b)
-    compare_result(result, "mul", a * b)
-    compare_result(result, "div", a / b)
-    compare_result(result, "sqrt", np.sqrt(c))
-    compare_result(result, "madd", (a * b) + c)
-    compare_result(result, "msub", (a * b) - c)
-    compare_result(result, "nmadd", -((a * b) + c))
-    compare_result(result, "nmsub", -((a * b) - c))
+    compare_result(result, "add", a + b, rel_tol=logger.epsilon)
+    compare_result(result, "sub", a - b, rel_tol=logger.epsilon)
+    compare_result(result, "mul", a * b, rel_tol=logger.epsilon)
+    compare_result(result, "div", a / b, rel_tol=logger.epsilon)
+    compare_result(result, "sqrt", np.sqrt(c), rel_tol=logger.epsilon)
+    compare_result(result, "madd", (a * b) + c, rel_tol=logger.epsilon)
+    compare_result(result, "msub", (a * b) - c, rel_tol=logger.epsilon)
+    compare_result(result, "nmadd", -((a * b) + c), rel_tol=logger.epsilon)
+    compare_result(result, "nmsub", -((a * b) - c), rel_tol=logger.epsilon)
+
+    subcase_name = "FPU"
 
     # log the result
-    logger.show_subcase_result("FPU", result)
+    logger.show_subcase_result(subcase_name, result)
 
     # return summary
     return logger.summary()
