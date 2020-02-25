@@ -57,6 +57,23 @@ void func_sos_filt_2S(const int8_t* p_x,
                       const func_sos_filt_2S_params_t* params,
                       int8_t* p_y);
 
+/**
+ * @brief Swap matrices A and B
+ *
+ * @param p_a Pointer to matrix A of shape [N, M]
+ * @param p_b Pointer to matrix B of shape [N, M]
+ * @param N number of rows of the two matrices
+ * @param M number of columns of the two matrices
+ * @param stride_a Number of 4-bytes between the start of each row of matrix A, stride_a >= N
+ * @param stride_b Number of 4-bytes between the start of each row of matrix B, stride_b >= N
+ */
+void func_swap_mat(uint32_t* p_a,
+                   uint32_t* p_b,
+                   unsigned int N,
+                   unsigned int M,
+                   unsigned int stride_a,
+                   unsigned int stride_b);
+
 
 
 #endif //__CL_FUNC_FUNCTIONAL_H__
