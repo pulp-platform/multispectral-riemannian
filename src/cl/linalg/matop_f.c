@@ -439,3 +439,61 @@ float linalg_vnorm_f(const float* p_a,
 
 }
 
+/**
+ * @brief Computes the transpose of a symmetric matrix A in place
+ *
+ * @param p_a Pointer to matrix A of shape[N, N]
+ * @param N Number of rows and columns of matrix A
+ */ 
+void linalg_transpose_sf(float* p_a,
+                         unsigned int N) {
+
+    float _val_a, _val_b;
+
+    for (int _n = 1; _n < N; _n++) {
+        for (int _m = 0; _m < _n; _m++) {
+            _val_a = p_a[_n * N + _m];
+            _val_b = p_a[_m * N + _n];
+            p_a[_n * N + _m] = _val_b;
+            p_a[_m * N + _n] = _val_a;
+        }
+    }
+}
+
+/**
+ * @brief prints out the matrix to standard out
+ *
+ * @param p_a Pointer to matrix A
+ * @param N number of rows of matrix A
+ * @param M number of columns of matrix A
+ * @param stride Number of 4-bytes between the start of each row of matrix A, stride >= M
+ */
+void linalg_print_mat_f(const float* p_a,
+                        unsigned int N,
+                        unsigned int M,
+                        unsigned int stride) {
+
+    const float* _mat_iter = p_a;
+
+    unsigned int line_offset = stride - M;
+
+    printf("[");
+    for (int _i = 0; _i < N; _i++) {
+        if (_i > 0) {
+            printf(",\n ");
+        }
+        printf("[");
+
+        for (int _j = 0; _j < M; _j++) {
+            if (_j > 0) {
+                printf(", ");
+            }
+            printf("%+.2e", *_mat_iter++);
+        }
+
+        printf("]");
+        _mat_iter += line_offset;
+    }
+    printf("]\n");
+
+}

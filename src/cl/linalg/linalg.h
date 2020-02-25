@@ -9,6 +9,24 @@
 #define __CL_LINALG_H__
 
 /**
+ * @brief Compute the tridiagonalization of a symmetric matrix A.
+ *
+ *     T = Q' A  Q
+ *     A = Q  T  Q'
+ *
+ * @param p_a Pointer to symmetric matrix A. At return, will contain the trigiagonalized matrix T
+ * @param p_q Pointer to orthogonal matrix Q. Input must either be the unit matrix I or any other 
+ *            orthogonal matrix. At return, will contain the transformation matrix L combined with
+ *            the previous matrix: Q_out = H Q_in
+ * @param N Dimension of all matrices.
+ * @param p_workspace Pointer to workspace, requires (N * (2N + 1)) space.
+ */
+void linalg_householder_tridiagonal(float* p_a,
+                                    float* p_q,
+                                    unsigned int N,
+                                    float* p_workspace);
+
+/**
  * @struct linalg_givens_rotation_t
  * @brief structure containing the sine and cosine for a givens rotation
  *
@@ -161,6 +179,15 @@ void linalg_matmul_T_f(const float* p_a,
                        float* p_y);
 
 /**
+ * @brief Computes the transpose of a symmetric matrix A in place
+ *
+ * @param p_a Pointer to matrix A of shape[N, N]
+ * @param N Number of rows and columns of matrix A
+ */ 
+void linalg_transpose_sf(float* p_a,
+                         unsigned int N);
+
+/**
  * @brief compute vector covariance matrix.
  *
  * @warning p_y must already be allocated, use L1 memory!
@@ -186,5 +213,30 @@ void linalg_vcovmat_f(const float* p_a,
 float linalg_vnorm_f(const float* p_a,
                      unsigned int N,
                      unsigned int stride);
+
+/**
+ * @brief computes the L2 norm of a given vector a
+ *
+ * @param p_a pointer to vector a
+ * @param N number of elements in vector a
+ * @param stride Increment from one element to another, use 1 per default
+ * @return l2 norm (sum of the squares)
+ */
+float linalg_vnorm_f(const float* p_a,
+                     unsigned int N,
+                     unsigned int stride);
+
+/**
+ * @brief prints out the matrix to standard out
+ *
+ * @param p_a Pointer to matrix A
+ * @param N number of rows of matrix A
+ * @param M number of columns of matrix A
+ * @param stride Number of 4-bytes between the start of each row of matrix A, stride >= M
+ */
+void linalg_print_mat_f(const float* p_a,
+                        unsigned int N,
+                        unsigned int M,
+                        unsigned int stride);
 
 #endif //__CL_LINALG_H__
