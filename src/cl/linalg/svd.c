@@ -6,12 +6,119 @@
  */
 
 #include "linalg.h"
+#include "../func/functional.h"
 #include "rt/rt_api.h"
 #include "math.h"
 #include "../insn.h"
 
 #define _GIVENS_SAVE_MIN 1.0e-10
 #define _SQRT2 1.41421353816986083984f
+#define _EPSILON 1.1920928955078125e-7f // smallest e, s.t. 1 + e > 1 (from numpy)
+
+/**
+ * @brief Compute the tridiagonalization of a symmetric matrix A.
+ *
+ *     T = Q' A  Q
+ *     A = Q  T  Q'
+ *
+ * @param p_a Pointer to symmetric matrix A. At return, will contain the trigiagonalized matrix T
+ * @param p_q Pointer to orthogonal matrix Q. Input must either be the unit matrix I or any other 
+ *            orthogonal matrix. At return, will contain the transformation matrix L combined with
+ *            the previous matrix: Q_out = H Q_in
+ * @param N Dimension of all matrices.
+ * @param p_workspace Pointer to workspace, requires (N * (2N + 1)) space.
+ */
+void linalg_householder_tridiagonal(float* p_a,
+                                    float* p_q,
+                                    unsigned int N,
+                                    float* p_workspace) {
+
+    float* _p_v = p_workspace;
+    float* _p_h = p_workspace + N;
+    float* _p_tmp = p_workspace + N * (N + 1);
+
+    float* _p_a = p_a;
+    float* _p_q = p_q;
+
+    float* _p_a_iter = _p_a;
+    float* _p_v_iter;
+    float* _p_h_iter;
+
+    float* _p_swap;
+
+    // Start with the iterations
+    for (int _k = 0; _k < N - 2; _k++) {
+
+        // pointer to A[k,k+1]
+        _p_a_iter = _p_a + _k * (N + 1) + 1;
+
+        // compute the scale of the row right of the current diagonal element
+        float _scale = linalg_vnorm_f(_p_a_iter, (N - _k - 1), 1);
+        if (_scale == 0.f) {
+            continue;
+        }
+
+        float _val = *(_p_a_iter++); // _p_a_iter now points to A[k,k+2]
+        float _sign = insn_fsgnj(1.f, _val);
+        // float _scaled_val = insn_fabs(_val / _scale);
+        float _scaled_val = _sign * _val / _scale;
+        float _z = (1.f + _scaled_val) * 0.5f;
+        float _sqrtz = insn_fsqrt(_z);
+        float _vec_scale = 1 / (2.f * _scale * _sqrtz);
+
+        // generate vector _p_v
+        // TODO optimize
+        _p_v_iter = _p_v;
+        for (int _i = 0; _i < _k + 1; _i++) {
+            *_p_v_iter++ = 0.f;
+        }
+        *_p_v_iter++ = _sqrtz;
+        for (int _i = _k + 2; _i < N; _i++) {
+            // read the element of A and multiply with the sign of _val
+            // float _tmp_val = insn_fsgnjx(*_p_a_iter++, _val);
+            float _tmp_val = _sign * (*_p_a_iter++);
+            // write the vector
+            *_p_v_iter++ = _tmp_val * _vec_scale;
+        }
+
+        // Generate the rotation matrix H
+        // TODO optimize
+        linalg_vcovmat_f(_p_v, N, 0, _p_h);
+        _p_h_iter = _p_h;
+        for (int _i = 0; _i < N; _i++) {
+            for (int _j = 0; _j < N; _j++) {
+                if (_i == _j) {
+                    *_p_h_iter = insn_fnmsub(*_p_h_iter, 2.f, 1.f);
+                } else {
+                    *_p_h_iter = -2.f * (*_p_h_iter);
+                }
+                _p_h_iter++;
+            }
+        }
+
+        // transform the matrices with H
+        linalg_matmul_f(_p_a, _p_h, N, N, N, _p_tmp);
+        linalg_matmul_f(_p_h, _p_tmp, N, N, N, _p_a); // TODO this second matmul can be optimized!
+
+        linalg_matmul_f(_p_q, _p_h, N, N, N, _p_tmp);
+
+        // swap pointers tmp and q
+        _p_swap = _p_tmp;
+        _p_tmp = _p_q;
+        _p_q = _p_swap;
+
+    }
+
+    /*
+     * We did the rotation (N-2) times in total. Thus, if (N-2) 2 3 == 0, the data is already at the
+     * correct position. 
+     */
+    float* _o_tmp = p_workspace + N * (N + 1); // reconstruct the original tmp matrix
+    if (_p_q != p_q) {
+        func_copy_mat((uint32_t*)_o_tmp, (uint32_t*)p_q, N, N, N, N);
+    }
+
+}
 
 /**
  * @brief Computes the givens rotation coefficients cosine and sine
