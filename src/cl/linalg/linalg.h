@@ -159,6 +159,22 @@ void linalg_matmul_f(const float* p_a,
                      float* p_y);
 
 /**
+ * @brief Compute the matrix multiplication of two floating point matrices, where the result
+ * is already known to be symmetric (used in Householder Transformation)
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to matrix B of shape [N, O]
+ * @param N Rows and columns of all matrices
+ * @param p_y Pointer to matrix Y = AB of shape [M, O]
+ */
+void linalg_matmul_to_sym_f(const float* p_a,
+                            const float* p_b,
+                            unsigned int N,
+                            float* p_y);
+
+/**
  * @brief Compute the matrix multiplication of two floating point matrices, where the second one
  * is transposed
  *

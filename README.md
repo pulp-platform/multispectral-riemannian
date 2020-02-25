@@ -20,7 +20,7 @@ Then, compile the shared library for the python model:
 
 ```
 cd multiscale_bci_python
-make
+make all
 ```
 
 Also, make sure to get the BCI Competition IV dataset 2a and store it in `multiscale_bci_python/dataset`

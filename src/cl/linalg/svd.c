@@ -59,15 +59,13 @@ void linalg_householder_tridiagonal(float* p_a,
         }
 
         float _val = *(_p_a_iter++); // _p_a_iter now points to A[k,k+2]
-        float _sign = insn_fsgnj(1.f, _val);
-        // float _scaled_val = insn_fabs(_val / _scale);
-        float _scaled_val = _sign * _val / _scale;
+        float _scaled_val = insn_fabs(_val / _scale);
         float _z = (1.f + _scaled_val) * 0.5f;
         float _sqrtz = insn_fsqrt(_z);
-        float _vec_scale = 1 / (2.f * _scale * _sqrtz);
+        float _vec_scale = 1.f / (2.f * _scale * _sqrtz);
 
         // generate vector _p_v
-        // TODO optimize
+        // TODO optimize (but it actually does not matter, all time is spent in matmul)
         _p_v_iter = _p_v;
         for (int _i = 0; _i < _k + 1; _i++) {
             *_p_v_iter++ = 0.f;
@@ -75,14 +73,13 @@ void linalg_householder_tridiagonal(float* p_a,
         *_p_v_iter++ = _sqrtz;
         for (int _i = _k + 2; _i < N; _i++) {
             // read the element of A and multiply with the sign of _val
-            // float _tmp_val = insn_fsgnjx(*_p_a_iter++, _val);
-            float _tmp_val = _sign * (*_p_a_iter++);
+            float _tmp_val = insn_fsgnjx(*_p_a_iter++, _val);
             // write the vector
             *_p_v_iter++ = _tmp_val * _vec_scale;
         }
 
         // Generate the rotation matrix H
-        // TODO optimize
+        // TODO optimize (but it actually does not matter, all time is spent in matmul)
         linalg_vcovmat_f(_p_v, N, 0, _p_h);
         _p_h_iter = _p_h;
         for (int _i = 0; _i < N; _i++) {
@@ -98,7 +95,8 @@ void linalg_householder_tridiagonal(float* p_a,
 
         // transform the matrices with H
         linalg_matmul_f(_p_a, _p_h, N, N, N, _p_tmp);
-        linalg_matmul_f(_p_h, _p_tmp, N, N, N, _p_a); // TODO this second matmul can be optimized!
+        linalg_matmul_f(_p_h, _p_tmp, N, N, N, _p_a);
+        //linalg_matmul_to_sym_f(_p_h, _p_tmp, N, _p_a);
 
         linalg_matmul_f(_p_q, _p_h, N, N, N, _p_tmp);
 

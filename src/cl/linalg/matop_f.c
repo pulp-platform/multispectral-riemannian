@@ -1,5 +1,5 @@
 /**
- * @file matmul.c
+ * @file matop_f.c
  * @author Tibor Schneider
  * @date 2020/02/22
  * @brief This file contains the functions for floating point matrix multiplication
@@ -190,6 +190,94 @@ void linalg_matmul_f(const float* p_a,
         }
         _p_a_iter += N;
         _p_b_iter = p_b;
+    }
+
+}
+
+
+/**
+ * @brief Compute the matrix multiplication of two floating point matrices, where the result
+ * is already known to be symmetric (used in Householder Transformation)
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to matrix A of shape [N, N]
+ * @param p_b Pointer to matrix B of shape [N, N]
+ * @param N Rows and columns of all matrices
+ * @param p_y Pointer to matrix Y = AB of shape [N, N]
+ */
+void linalg_matmul_to_sym_f(const float* p_a,
+                            const float* p_b,
+                            unsigned int N,
+                            float* p_y) {
+
+    // use iterators
+    const float* _p_a_iter_comp;
+    const float* _p_b_iter_comp;
+
+    float _acc0, _acc1, _acc2, _acc3;
+    float _val;
+
+    // loop over every output element
+    for (unsigned int _m = 0; _m < N; _m++) {
+
+        unsigned int num_block = _m % 4;
+        unsigned int rem_block = _m % 4;
+
+        unsigned int _o;
+
+        for (_o = 0; _o <= num_block; _o++) {
+
+            _acc0 = 0;
+            _acc1 = 0;
+            _acc2 = 0;
+            _acc3 = 0;
+
+            _p_a_iter_comp = p_a + N * _m;
+            _p_b_iter_comp = p_b + _o * 4;
+
+            for (unsigned int _n = 0; _n < N; _n++) {
+                _val = *_p_a_iter_comp;
+                _acc0 = insn_fmadd(_val, *(_p_b_iter_comp + 0), _acc0);
+                _acc1 = insn_fmadd(_val, *(_p_b_iter_comp + 1), _acc1);
+                _acc2 = insn_fmadd(_val, *(_p_b_iter_comp + 2), _acc2);
+                _acc3 = insn_fmadd(_val, *(_p_b_iter_comp + 3), _acc3);
+
+                _p_a_iter_comp++;
+                _p_b_iter_comp += N;
+            }
+
+            p_y[_m * N + (_o * 4 + 0)] = _acc0;
+            p_y[(_o * 4 + 0) * N + _m] = _acc0;
+
+            p_y[_m * N + (_o * 4 + 1)] = _acc1;
+            p_y[(_o * 4 + 1) * N + _m] = _acc1;
+
+            p_y[_m * N + (_o * 4 + 2)] = _acc2;
+            p_y[(_o * 4 + 2) * N + _m] = _acc2;
+
+            p_y[_m * N + (_o * 4 + 3)] = _acc3;
+            p_y[(_o * 4 + 3) * N + _m] = _acc3;
+        }
+
+        for (_o = _o * 4; _o <= _m; _o++) {
+
+            _acc0 = 0;
+
+            _p_a_iter_comp = p_a + N * _m;
+            _p_b_iter_comp = p_b + _o;
+
+            for (unsigned int _n = 0; _n < N; _n++) {
+                _val = *_p_a_iter_comp;
+                _acc0 = insn_fmadd(_val, *(_p_b_iter_comp + 0), _acc0);
+
+                _p_a_iter_comp++;
+                _p_b_iter_comp += N;
+            }
+
+            p_y[_m * N + (_o + 0)] = _acc0;
+            p_y[(_o + 0) * N + _m] = _acc0;
+        }
     }
 
 }
