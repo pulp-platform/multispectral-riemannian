@@ -5,11 +5,32 @@ __email__ = "sctibor@student.ethz.ch"
 
 import numpy as np
 import unittest
+import os
+import cffi
 
 # with 1e-4, we get 1e-1 accuracy, requiring approx 360 iterations
 SVD_EPSILON = 1e-4 # 1e-15 # 2e-4
 _ACCURACY = 1e-1 # with epsilon:1e-4
 MIN_ALLOWED_EIGENVALUE = 1e-3
+USE_CFFI = True
+
+FFI_HDR = """
+void householder_tridiagonal(float* p_a, float* p_q, unsigned int N, float* p_workspace);
+"""
+FFI_LIB = "accel_svd.so"
+
+
+def init_cffi_lib():
+    ffi = cffi.FFI()
+    ffi.cdef(FFI_HDR)
+    path = os.path.dirname(os.path.abspath(__file__))
+    lib_file = os.path.join(path, FFI_LIB)
+    lib = ffi.dlopen(lib_file)
+    return ffi, lib
+
+
+FFI, LIB = init_cffi_lib()
+
 
 def logm(mat, epsilon=SVD_EPSILON):
     """ Computes the matrix logarithm of a real, symmetric matrix
@@ -225,7 +246,11 @@ def _householder_tridiagonal(mat):
     np.array, size=(N, N): R: orthogonal matrix
     """
 
+    if USE_CFFI:
+        return _householder_tridiagonal_c(mat)
+
     assert mat.shape[1] == mat.shape[0]
+
     N = mat.shape[0]
     T = mat.copy()
     L = np.eye(N).astype(np.float32)
@@ -248,6 +273,25 @@ def _householder_tridiagonal(mat):
         R = R @ H
 
     return L.T, T, R.T
+
+
+def _householder_tridiagonal_c(mat):
+    """ C function to compute householder tridiagonal matrix """
+    assert mat.shape[1] == mat.shape[0]
+    assert mat.dtype == np.float32
+
+    N = mat.shape[0]
+    T = mat.copy()
+    Q = np.eye(N).astype(np.float32)
+    workspace = np.zeros((N, 2 * N + 1), dtype=np.float32)
+    LIB.householder_tridiagonal(FFI.cast("float*", T.ctypes.data),
+                                FFI.cast("float*", Q.ctypes.data),
+                                FFI.cast("unsigned int", N),
+                                FFI.cast("float*", workspace.ctypes.data))
+
+    L = Q
+    R = L.T
+    return L, T, R
 
 
 GIVENS_SAVE_MINIMUM = 1e-10
