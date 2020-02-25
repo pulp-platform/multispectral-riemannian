@@ -74,6 +74,23 @@ void func_swap_mat(uint32_t* p_a,
                    unsigned int stride_a,
                    unsigned int stride_b);
 
+/**
+ * @brief Copy matrices A to B
+ *
+ * @param p_src Pointer to matrix A of shape [N, M]
+ * @param p_dst Pointer to matrix B of shape [N, M]
+ * @param N number of rows of the two matrices
+ * @param M number of columns of the two matrices
+ * @param stride_src Number of 4-bytes between the start of each row of matrix A, stride_a >= N
+ * @param stride_src Number of 4-bytes between the start of each row of matrix B, stride_b >= N
+ */
+void func_copy_mat(uint32_t* p_src,
+                   uint32_t* p_dst,
+                   unsigned int N,
+                   unsigned int M,
+                   unsigned int stride_src,
+                   unsigned int stride_dst);
+
 
 
 #endif //__CL_FUNC_FUNCTIONAL_H__

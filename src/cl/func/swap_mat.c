@@ -31,8 +31,8 @@ void func_swap_mat(uint32_t* p_a,
     uint32_t _val_a;
     uint32_t _val_b;
 
-    unsigned int newline_a = stride_a - N;
-    unsigned int newline_b = stride_b - N;
+    unsigned int newline_a = stride_a - M;
+    unsigned int newline_b = stride_b - M;
 
     for (int _n = 0; _n < N; _n++) {
         for (int _m = 0; _m < M; _m++) {

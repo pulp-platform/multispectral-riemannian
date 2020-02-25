@@ -25,11 +25,9 @@ def gen_stimuli(N, M, stride_a, stride_b):
     """
     A = np.random.randint(0, 1 << 32, (N, stride_a))
     B = np.random.randint(0, 1 << 32, (N, stride_b))
-    AS = A.copy()
     BS = B.copy()
-    AS[:N, :M] = B[:N, :M]
     BS[:N, :M] = A[:N, :M]
-    return A, B, AS, BS
+    return A, B, BS
 
 
 def test():
@@ -43,24 +41,24 @@ def test():
     for N, M, stride_a, stride_b in [(22, 12, 22, 12),
                                      (12, 22, 30, 22),
                                      (22, 22, 22, 30),
-                                     (22, 22, 30, 40)]:
+                                     (22, 22, 30, 40),
+                                     (22, 21, 35, 31)]:
 
         # generate makefile
         mkf = Makefile()
         mkf.add_fc_test_source("test.c")
         mkf.add_cl_test_source("cluster.c")
-        mkf.add_cl_prog_source("func/swap_mat.c")
+        mkf.add_cl_prog_source("func/copy_mat.c")
         mkf.write()
 
         # generate the stimuli
-        A, B, AS, BS = gen_stimuli(N, M, stride_a, stride_b)
+        A, B, BS = gen_stimuli(N, M, stride_a, stride_b)
 
         # prepare header file
         header = HeaderFile("test_stimuli.h")
         # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
         header.add(HeaderArray("a_vec", "uint32_t", A.ravel()))
         header.add(HeaderArray("b_vec", "uint32_t", B.ravel()))
-        header.add(HeaderArray("a_exp_vec", "uint32_t", AS.ravel()))
         header.add(HeaderArray("b_exp_vec", "uint32_t", BS.ravel()))
         header.add(HeaderConstant("N_DIM", N))
         header.add(HeaderConstant("M_DIM", M))
