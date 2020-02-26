@@ -7,7 +7,7 @@ import numpy as np
 from test_utils import parse_output, TestLogger
 from header_file import HeaderFile, HeaderArray, HeaderConstant
 from makefile import Makefile
-from svd import _householder_tridiagonal_c as householder_tridiagonal
+from svd import _householder_tridiagonal as householder_tridiagonal
 from functional import float_as_int_repr
 
 TESTNAME = "cl::linalg::householder_tridiagonal"

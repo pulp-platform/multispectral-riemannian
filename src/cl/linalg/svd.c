@@ -94,11 +94,32 @@ void linalg_householder_tridiagonal(float* p_a,
         }
 
         // transform the matrices with H
-        linalg_matmul_f(_p_a, _p_h, N, N, N, _p_tmp);
-        linalg_matmul_f(_p_h, _p_tmp, N, N, N, _p_a);
-        //linalg_matmul_to_sym_f(_p_h, _p_tmp, N, _p_a);
+        unsigned int _submat_size = N - _k - 1;
 
-        linalg_matmul_f(_p_q, _p_h, N, N, N, _p_tmp);
+        //linalg_matmul_f(_p_a, _p_h, N, N, N, _p_tmp);
+        func_copy_mat((uint32_t*)_p_a, (uint32_t*)_p_tmp, N, _k + 1, N, N); // TODO only copy the necessary part
+        linalg_matmul_stride_f(_p_a + _k + 1,
+                               _p_h + (_k + 1) * (N + 1),
+                               N, _submat_size, _submat_size,
+                               N, N, N,
+                               _p_tmp + _k + 1);
+
+        //linalg_matmul_to_sym_f(_p_h, _p_tmp, N, _p_a);
+        //linalg_matmul_f(_p_h, _p_tmp, N, N, N, _p_a);
+        func_copy_mat((uint32_t*)_p_tmp, (uint32_t*)_p_a, _k + 1, N, N, N);
+        linalg_matmul_stride_f(_p_h + (_k + 1) * (N + 1),
+                               _p_tmp + (_k + 1) * N,
+                               _submat_size, _submat_size, N,
+                               N, N, N,
+                               _p_a + (_k + 1) * N);
+
+        //linalg_matmul_f(_p_q, _p_h, N, N, N, _p_tmp);
+        func_copy_mat((uint32_t*)_p_q, (uint32_t*)_p_tmp, N, _k + 1, N, N);
+        linalg_matmul_stride_f(_p_q + _k + 1,
+                               _p_h + (_k + 1) * (N + 1),
+                               N, _submat_size, _submat_size,
+                               N, N, N,
+                               _p_tmp + _k + 1);
 
         // swap pointers tmp and q
         _p_swap = _p_tmp;

@@ -107,14 +107,20 @@ void linalg_matsub_f(const float* p_a,
  * @param M Rows of matrix A and Y
  * @param N Rows of matrix B and columns of matrix A
  * @param O Columns of matrix B and Y
+ * @param stride_a number of elements between the beginning of each row of matrix A, stride_a >= N
+ * @param stride_b number of elements between the beginning of each row of matrix B, stride_b >= O
+ * @param stride_y number of elements between the beginning of each row of matrix Y, stride_y >= O
  * @param p_y Pointer to matrix Y = AB of shape [M, O]
  */
-void linalg_matmul_f(const float* p_a,
-                     const float* p_b,
-                     unsigned int M,
-                     unsigned int N,
-                     unsigned int O,
-                     float* p_y) {
+void linalg_matmul_stride_f(const float* p_a,
+                            const float* p_b,
+                            unsigned int M,
+                            unsigned int N,
+                            unsigned int O,
+                            unsigned int stride_a,
+                            unsigned int stride_b,
+                            unsigned int stride_y,
+                            float* p_y) {
 
     /*
      * Compute N elements of the output matrix at a time, reducing the number of required elements 
@@ -158,7 +164,7 @@ void linalg_matmul_f(const float* p_a,
                 _acc3 = insn_fmadd(_val_a, *(_p_b_iter_comp + 3), _acc3);
 
                 _p_a_iter_comp++;
-                _p_b_iter_comp += O;
+                _p_b_iter_comp += stride_b;
             }
 
             *(_p_y_iter++) = _acc0;
@@ -181,15 +187,16 @@ void linalg_matmul_f(const float* p_a,
                 _acc0 = insn_fmadd(*_p_a_iter_comp, *_p_b_iter_comp, _acc0);
 
                 _p_a_iter_comp++;
-                _p_b_iter_comp += O;
+                _p_b_iter_comp += stride_b;
             }
 
             *(_p_y_iter++) = _acc0;
             _p_b_iter++;
 
         }
-        _p_a_iter += N;
+        _p_a_iter += stride_a;
         _p_b_iter = p_b;
+        _p_y_iter += (stride_y - O);
     }
 
 }
