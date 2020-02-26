@@ -15,7 +15,17 @@ MIN_ALLOWED_EIGENVALUE = 1e-3
 USE_CFFI = True
 
 FFI_HDR = """
-void householder_tridiagonal(float* p_a, float* p_q, unsigned int N, float* p_workspace);
+void svd_sym_tridiag(float* p_main_diag,
+                     float* p_off_diag,
+                     float* p_q,
+                     unsigned int N,
+                     unsigned int stride,
+                     unsigned int current_pos);
+
+void householder_tridiagonal(float* p_a,
+                             float* p_q,
+                             unsigned int N,
+                             float* p_workspace);
 """
 FFI_LIB = "accel_svd.so"
 
@@ -73,7 +83,10 @@ def svd(mat, epsilon=SVD_EPSILON, with_n_iter=False):
     """
     # return _jacobi_eigv(mat)
     Lt, T, Rt = _householder_tridiagonal(mat)
-    eigvals, Q, n_iter = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=True)
+    if with_n_iter:
+        eigvals, Q, n_iter = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=True)
+    else:
+        eigvals, Q = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=False)
     D = np.diag(eigvals)
     L = Lt @ Q
     R = Q.T @ Rt
@@ -108,7 +121,18 @@ def _qr_symm_tridiag(T, epsilon=SVD_EPSILON, with_n_iter=False):
     main_diag = np.diag(T).copy()
     off_diag = np.diag(T, k=1).copy() # range 0..N-1, in reference, it is 1..N (also, they use 1-indexing)
 
-    return _qr_symm_tridiag_work(main_diag, off_diag, epsilon=epsilon, with_n_iter=with_n_iter)
+    if USE_CFFI and not with_n_iter:
+        N = T.shape[0]
+        Q = np.eye(N).astype(np.float32)
+        LIB.svd_sym_tridiag(FFI.cast("float*", main_diag.ctypes.data),
+                            FFI.cast("float*", off_diag.ctypes.data),
+                            FFI.cast("float*", Q.ctypes.data),
+                            FFI.cast("unsigned int", N),
+                            FFI.cast("unsigned int", N),
+                            FFI.cast("unsigned int", 0))
+        return main_diag, Q
+    else:
+        return _qr_symm_tridiag_work(main_diag, off_diag, epsilon=epsilon, with_n_iter=with_n_iter)
 
 
 def _qr_symm_tridiag_work(main_diag, off_diag, epsilon=SVD_EPSILON, with_n_iter=False):
