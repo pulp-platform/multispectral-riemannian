@@ -166,6 +166,19 @@ inline float insn_fsqrt(float a) {
 }
 
 /**
+ * @brief calls fsqrt.s, 5-8 cycles latency
+ * @param a float
+ * @returns sqrt(a)
+ */
+inline float insn_fpow2(float a) {
+    float y;
+    asm ("fmul.s %[y],%[a],%[a];"
+         : [y] "=&f" (y)
+         : [a] "f" (a));
+    return y;
+}
+
+/**
  * @brief calls fabs.s, (probably) 1 cycle latency
  * @param a float
  * @returns |a|

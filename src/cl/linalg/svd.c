@@ -14,6 +14,181 @@
 #define _GIVENS_SAVE_MIN 1.0e-10
 #define _SQRT2 1.41421353816986083984f
 #define _EPSILON 1.1920928955078125e-7f // smallest e, s.t. 1 + e > 1 (from numpy)
+#define _SVD_PRECISION 1e-4f
+
+/**
+ * @brief Compute the SVD of a symmetric tridiagonal matrix using QR decomposition:
+ *
+ *     A = Q D Q^T
+ *
+ * @param p_main_diag Pointer to vector containing the diagonal elements of A, size = (N,). After
+ *                    returning, this vector contains all the eigenvalues.
+ * @param p_off_diag Pointer to vector containing the off-diagonal elements of A, size = (N-1, ).
+ *                   This vector is deleted after returning.
+ * @param p_q Pointer to Matrix of size (N, N). After returning, this vector contains the
+ *            orthogonal transformation matrix as described above. On Entry, this must either
+ *            contain the unit matrix I or another orthogonal transformation (e.g. from householder
+ *            tridiagonalization)
+ * @param N Size of matrix Q and A
+ * @param stride Stride for accessing eigenvalue matrix Q (line length of original matrix Q)
+ * @param current_pos Position for the current recursion step, set to 0 to start it.
+ */
+void linalg_svd_sym_tridiag(float* p_main_diag,
+                            float* p_off_diag,
+                            float* p_q,
+                            unsigned int N,
+                            unsigned int stride,
+                            unsigned int current_pos) {
+
+    // m: main iterator
+    int _m = N - 1;
+
+    // special cases to break out of recurrence
+    if (N == 1) {
+        return;
+    }
+
+    if (N == 2) {
+        // Compute the diagonalization of the 2x2 matrix
+        linalg_evd_2x2_t _evd = linalg_evd_2x2(*p_main_diag, *p_off_diag, *(p_main_diag + 1));
+
+        // write the eigenvalues into the main diag
+        *(p_main_diag + 0) = _evd.ev1;
+
+        // apply the rotation
+        linalg_givens_rotation_t _rot = {_evd.cs, _evd.sn};
+        linalg_apply_givens_rotation_f(p_q, _rot, current_pos, stride);
+
+        // this instruction needs to be here, because GCC fails if the two instructions are one after the other
+        // If GCC does not like the code like this, fall back to O2
+        *(p_main_diag + 1) = _evd.ev2;
+
+        return;
+    }
+
+    // If N >= 3, do the normal QR decomposition
+    while (_m > 0) {
+
+        // check if the matrix left to be transformed has off diagonal elements which are zero
+        for (int _k = 0; _k < _m - 1; _k++) {
+            if (insn_fabs(p_off_diag[_k]) < _EPSILON) {
+                // Divide and Conquer! decompose the matrix
+                linalg_svd_sym_tridiag(p_main_diag,
+                                       p_off_diag,
+                                       p_q,
+                                       _k + 1, stride, 0);
+
+                linalg_svd_sym_tridiag(p_main_diag + _k + 1,
+                                       p_off_diag + _k + 1,
+                                       p_q,
+                                       _m - _k, stride, _k + 1);
+
+                // return
+                return;
+            }
+        }
+
+        // do wilkinson shift
+        float _shift;
+        float _d = (p_main_diag[_m - 1] - p_main_diag[_m]) * 0.5f;
+        if (_d == 0) {
+            _shift = p_main_diag[_m] - insn_fabs(p_off_diag[_m - 1]);
+        } else {
+            float _off_diag_pow2 = p_off_diag[_m - 1] * p_off_diag[_m - 1];
+            float _tmp = insn_fsqrt(insn_fmadd(_d, _d, _off_diag_pow2));
+            _tmp = insn_fsgnj(_tmp, _d);
+            _shift = p_main_diag[_m] - _off_diag_pow2 / (_d + _tmp);
+        }
+
+        // start the implicit QR step
+        float _x = p_main_diag[0] - _shift;
+        float _y = p_off_diag[0];
+
+        for (int _k = 0; _k < _m; _k++) {
+
+            // determine the givens rotation
+            linalg_givens_rotation_t _rot;
+            if (_m > 1) {
+                _rot = linalg_givens_rotation(_x, _y);
+            } else {
+                _rot = linalg_givens_rotation_diag(p_main_diag[0], p_off_diag[0], p_main_diag[1]);
+            }
+
+            // compute some values
+            float _w = insn_fmsub(_rot.cs, _x, _rot.sn * _y);
+            float _d = insn_fsub(p_main_diag[_k], p_main_diag[_k + 1]);
+            float _z = insn_fmadd(2 * _rot.cs, p_off_diag[_k], _d * _rot.sn) * _rot.sn;
+
+            // do the step on the main and off diagonal
+            p_main_diag[_k] = insn_fsub(p_main_diag[_k], _z);
+            p_main_diag[_k + 1] = insn_fadd(p_main_diag[_k + 1], _z);
+            p_off_diag[_k] = insn_fmadd(p_off_diag[_k], insn_fmsub(_rot.cs, _rot.cs, _rot.sn * _rot.sn), _d * _rot.cs * _rot.sn);
+            if (_k > 0) {
+                p_off_diag[_k - 1] = _w;
+            }
+
+            // update x and y
+            _x = p_off_diag[_k];
+            if (_k < _m - 1) {
+                _y = insn_fnmadd(_rot.sn, p_off_diag[_k + 1], 0.f);
+                p_off_diag[_k + 1] = insn_fmul(_rot.cs, p_off_diag[_k + 1]);
+            }
+
+            // update the eigenvectors
+            _rot.sn = -_rot.sn; // change the sign for the rotation because the sine is defined differently here!
+            linalg_apply_givens_rotation_f(p_q, _rot, current_pos + _k, stride);
+
+        }
+
+        // check for convergence
+        if (insn_fabs(p_off_diag[_m - 1]) < _SVD_PRECISION * (insn_fabs(p_main_diag[_m - 1]) + insn_fabs(p_main_diag[_m]))) {
+            _m -= 1;
+        }
+
+    }
+
+    return;
+
+}
+
+/**
+ * @brief Applies the givens rotation on matrix A
+ *
+ * @warning this funciton operates inplace
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], will be modified
+ * @param rot Rotation structure
+ * @param k Position of the rotation, 0 <= k < N-1
+ * @param N Dimension of matrix a
+ */
+void linalg_apply_givens_rotation_f(float* p_a,
+                                    linalg_givens_rotation_t rot,
+                                    unsigned int k,
+                                    unsigned int N) {
+
+    float* _p_a_iter = p_a + k;
+
+    float _val_a, _val_b;
+    float _res_a, _res_b;
+
+    // loop over all rows
+    for (int _i = 0; _i < N; _i++) {
+        // load the two values
+        _val_a = *(_p_a_iter + 0);
+        _val_b = *(_p_a_iter + 1);
+
+        // compute the new values
+        _res_a = insn_fmadd(_val_a, rot.cs, _val_b * rot.sn);
+        _res_b = insn_fmsub(_val_b, rot.cs, _val_a * rot.sn);
+
+        // store back
+        *(_p_a_iter + 0) = _res_a;
+        *(_p_a_iter + 1) = _res_b;
+
+        // go to the next line
+        _p_a_iter += N;
+    }
+}
 
 /**
  * @brief Compute the tridiagonalization of a symmetric matrix A.
@@ -205,9 +380,9 @@ linalg_givens_rotation_t linalg_givens_rotation_diag(float a,
     linalg_givens_rotation_t res;
 
     if (adf > ab) {
-        rt = adf * insn_fsqrt(1.f + (ab / adf) * (ab / adf));
+        rt = adf * insn_fsqrt(insn_fmadd((ab / adf), (ab / adf), 1.f));
     } else if (adf < ab) {
-        rt = ab * insn_fsqrt(1.f + (adf / ab) * (adf / ab));
+        rt = ab * insn_fsqrt(insn_fmadd((adf / ab), (adf / ab), 1.f));
     } else {
         rt = ab * _SQRT2;
     }
@@ -228,7 +403,7 @@ linalg_givens_rotation_t linalg_givens_rotation_diag(float a,
 
     if (fabs(cs) > ab) {
         ct = -tb / cs;
-        res.sn = 1.f / insn_fsqrt(1.f + ct * ct);
+        res.sn = 1.f / insn_fsqrt(insn_fmadd(ct, ct, 1.f));
         res.cs = res.sn * ct;
     } else {
         if (ab == 0.f) {
@@ -236,7 +411,7 @@ linalg_givens_rotation_t linalg_givens_rotation_diag(float a,
             res.sn = 0.f;
         } else {
             tn = -cs / tb;
-            res.cs = 1.f / insn_fsqrt(1.f + tn * tn);
+            res.cs = 1.f / insn_fsqrt(insn_fmadd(tn ,tn, 1.f));
             res.sn = tn * res.cs;
         }
     }
@@ -293,9 +468,9 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
     }
 
     if (adf > ab) {
-        rt = adf * insn_fsqrt(1.f + (ab / adf) * (ab / adf));
+        rt = adf * insn_fsqrt(insn_fmadd((ab / adf), (ab / adf), 1.f));
     } else if (adf < ab) {
-        rt = ab * insn_fsqrt(1.f + (adf / ab) * (adf / ab));
+        rt = ab * insn_fsqrt(insn_fmadd((adf / ab), (adf / ab), 1.f));
     } else {
         rt = ab * _SQRT2;
     }
@@ -303,11 +478,11 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
     if (sm < 0.f) {
         res.ev1 = 0.5f * (sm - rt);
         sgn1 = -1;
-        res.ev2 = (acmx / res.ev1) * acmn - (b / res.ev1) * b;
+        res.ev2 = insn_fmsub((acmx / res.ev1), acmn, (b / res.ev1) * b);
     } else if (sm > 0.f) {
         res.ev1 = 0.5f * (sm + rt);
         sgn1 = 1;
-        res.ev2 = (acmx / res.ev1) * acmn - (b / res.ev1) * b;
+        res.ev2 = insn_fmsub((acmx / res.ev1), acmn, (b / res.ev1) * b);
     } else {
         res.ev1 = 0.5f * rt;
         res.ev2 = -0.5f * rt;
@@ -324,7 +499,7 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
 
     if (fabs(cs) > ab) {
         ct = -tb / cs;
-        res.sn = 1.f / insn_fsqrt(1.f + ct * ct);
+        res.sn = 1.f / insn_fsqrt(insn_fmadd(ct, ct, 1.f));
         res.cs = res.sn * ct;
     } else {
         if (ab == 0.f) {
@@ -332,7 +507,7 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
             res.sn = 0.f;
         } else {
             tn = -cs / tb;
-            res.cs = 1.f / insn_fsqrt(1.f + tn * tn);
+            res.cs = 1.f / insn_fsqrt(insn_fmadd(tn ,tn, 1.f));
             res.sn = tn * res.cs;
         }
     }

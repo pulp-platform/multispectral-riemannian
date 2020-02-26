@@ -8,6 +8,31 @@
 #ifndef __CL_LINALG_H__
 #define __CL_LINALG_H__
 
+
+/**
+ * @brief Compute the SVD of a symmetric tridiagonal matrix using QR decomposition:
+ *
+ *     A = Q D Q^T
+ *
+ * @param p_main_diag Pointer to vector containing the diagonal elements of A, size = (N,). After
+ *                    returning, this vector contains all the eigenvalues.
+ * @param p_off_diag Pointer to vector containing the off-diagonal elements of A, size = (N-1, ).
+ *                   This vector is deleted after returning.
+ * @param p_q Pointer to Matrix of size (N, N). After returning, this vector contains the
+ *            orthogonal transformation matrix as described above. On Entry, this must either
+ *            contain the unit matrix I or another orthogonal transformation (e.g. from householder
+ *            tridiagonalization)
+ * @param N Size of matrix Q and A
+ * @param stride Stride for accessing eigenvalue matrix Q (line length of original matrix Q)
+ * @param current_pos Position for the current recursion step, set to 0 to start it.
+ */
+void linalg_svd_sym_tridiag(float* p_main_diag,
+                            float* p_off_diag,
+                            float* p_q,
+                            unsigned int N,
+                            unsigned int stride,
+                            unsigned int current_pos);
+
 /**
  * @brief Compute the tridiagonalization of a symmetric matrix A.
  *
@@ -163,6 +188,21 @@ void linalg_matmul_stride_f(const float* p_a,
                             unsigned int stride_b,
                             unsigned int stride_y,
                             float* p_y);
+
+/**
+ * @brief Applies the givens rotation on matrix A
+ *
+ * @warning this funciton operates inplace
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], will be modified
+ * @param rot Rotation structure
+ * @param k Position of the rotation, 0 <= k < N-1
+ * @param N Dimension of matrix a
+ */
+void linalg_apply_givens_rotation_f(float* p_a,
+                                    linalg_givens_rotation_t rot,
+                                    unsigned int k,
+                                    unsigned int N);
 
 /**
  * @brief Compute the matrix multiplication of two floating point matrices
