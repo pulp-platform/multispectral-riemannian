@@ -26,6 +26,30 @@ void householder_tridiagonal(float* p_a,
                              float* p_q,
                              unsigned int N,
                              float* p_workspace);
+
+float vnorm_f(const float* p_a,
+              unsigned int N,
+              unsigned int stride);
+
+typedef struct {
+    float cs;
+    float sn;
+} givens_rotation_t;
+
+typedef struct {
+    float ev1;
+    float ev2;
+    float cs;
+    float sn;
+} evd_2x2_t;
+
+givens_rotation_t givens_rotation_diag(float a,
+                                       float b,
+                                       float c);
+
+evd_2x2_t evd_2x2(float a,
+                  float b,
+                  float c);
 """
 FFI_LIB = "accel_svd.so"
 
@@ -280,7 +304,7 @@ def _householder_tridiagonal(mat):
     L = np.eye(N).astype(np.float32)
     R = np.eye(N).astype(np.float32)
     for k in range(N-2):
-        s = np.linalg.norm(T[k+1:, k])
+        s = _vec_norm(T[k+1:, k])
         if s == 0:
             continue
         val = T[k+1, k]
@@ -316,6 +340,19 @@ def _householder_tridiagonal_c(mat):
     L = Q
     R = L.T
     return L, T, R
+
+
+def _vec_norm(x):
+    """ Returns the norm of vector x """
+    if USE_CFFI:
+        # copy x to make sure that the memory is nicely aligned
+        y = x.copy().ravel().astype(np.float32)
+        N = y.shape[0]
+        return LIB.vnorm_f(FFI.cast("float*", y.ctypes.data),
+                           FFI.cast("unsigned int", N),
+                           FFI.cast("unsigned int", 1))
+    else:
+        return np.linalg.norm(x)
 
 
 GIVENS_SAVE_MINIMUM = 1e-10
@@ -380,6 +417,13 @@ def _evd_2x2(a, b, c):
     rt1: np.float32, first (larger) eigenvalue
     rt2: np.float32, second (smaller) eigenvalue
     """
+
+    if USE_CFFI:
+        evd = LIB.evd_2x2(FFI.cast("float", a),
+                          FFI.cast("float", b),
+                          FFI.cast("float", c))
+        return evd.cs, evd.sn, evd.ev1, evd.ev2
+
     zero = np.float32(0)
     half = np.float32(0.5)
     one = np.float32(1)
@@ -467,6 +511,13 @@ def _givens_diag(a, b, c):
     cs: np.float32, cosine
     sn: np.float32, sine
     """
+
+    if USE_CFFI:
+        rot = LIB.givens_rotation_diag(FFI.cast("float", a),
+                                       FFI.cast("float", b),
+                                       FFI.cast("float", c))
+        return rot.cs, rot.sn
+
     zero = np.float32(0)
     one = np.float32(1)
     two = np.float32(2)
@@ -662,6 +713,7 @@ def _epsilon_sweep():
     for accuracy in [1e-0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]:
         required_eps, n_iter = _determine_epsilon_for_accuracy(accuracy)
         print(f"For accuracy: {accuracy:.0E}, required epsilon: {required_eps:.0E}, n_iter: {n_iter:.1f}")
+
 
 if __name__ == "__main__":
     _epsilon_sweep()
