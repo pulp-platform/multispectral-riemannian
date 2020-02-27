@@ -17,6 +17,7 @@ typedef struct {
     float sn;
 } evd_2x2_t;
 
+void svd_sym(float* p_a, float* p_q, unsigned int N, float* p_workspace);
 void svd_sym_tridiag(float* p_main_diag, float* p_off_diag, float* p_q, unsigned int N, unsigned int stride, unsigned int current_pos);
 void householder_tridiagonal(float* p_a, float* p_q, unsigned int N, float* p_workspace);
 float vnorm_f(const float* p_a, unsigned int N, unsigned int stride);
@@ -27,6 +28,41 @@ void apply_givens_rotation_f(float* p_a, givens_rotation_t rot, unsigned int k, 
 givens_rotation_t givens_rotation(float a, float b);
 givens_rotation_t givens_rotation_diag(float a, float b, float c);
 evd_2x2_t evd_2x2(float a, float b, float c);
+
+void svd_sym(float* p_a,
+             float* p_q,
+             unsigned int N,
+             float* p_workspace) {
+
+    // first, do householder transformation
+    householder_tridiagonal(p_a, p_q, N, p_workspace);
+
+    // next, generate main and off diagonal vectors
+    float* _p_main_diag = p_workspace;
+    float* _p_off_diag = p_workspace + N;
+
+    for (unsigned int _i = 0; _i < N - 1; _i++) {
+        _p_main_diag[_i] = p_a[_i * (N + 1)];
+        _p_off_diag[_i] = p_a[_i * (N + 1) + 1];
+    }
+    _p_main_diag[N - 1] = p_a[N * N - 1];
+
+    // do the svd of the tridiagonal matrix
+    svd_sym_tridiag(_p_main_diag, _p_off_diag, p_q, N, N, 0);
+
+    // create the diagonal matrix
+    float* _p_a_iter = p_a;
+    for (unsigned int _i = 0; _i < N; _i++) {
+        for (unsigned int _j = 0; _j < N; _j++) {
+            if (_i == _j) {
+                *_p_a_iter++ = _p_main_diag[_i];
+            } else {
+                *_p_a_iter++ = 0.f;
+            }
+        }
+    }
+
+}
 
 void svd_sym_tridiag(float* p_main_diag,
                      float* p_off_diag,

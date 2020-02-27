@@ -15,6 +15,11 @@ MIN_ALLOWED_EIGENVALUE = 1e-3
 USE_CFFI = True
 
 FFI_HDR = """
+void svd_sym(float* p_a,
+             float* p_q,
+             unsigned int N,
+             float* p_workspace);
+
 void svd_sym_tridiag(float* p_main_diag,
                      float* p_off_diag,
                      float* p_q,
@@ -43,6 +48,9 @@ typedef struct {
     float sn;
 } evd_2x2_t;
 
+givens_rotation_t givens_rotation(float a,
+                                  float b);
+
 givens_rotation_t givens_rotation_diag(float a,
                                        float b,
                                        float c);
@@ -50,6 +58,13 @@ givens_rotation_t givens_rotation_diag(float a,
 evd_2x2_t evd_2x2(float a,
                   float b,
                   float c);
+
+void matmul_f(const float* p_a,
+              const float* p_b,
+              unsigned int M,
+              unsigned int N,
+              unsigned int O,
+              float* p_y);
 """
 FFI_LIB = "accel_svd.so"
 
@@ -105,18 +120,32 @@ def svd(mat, epsilon=SVD_EPSILON, with_n_iter=False):
     np.array, size=(N, N): D, diagonal matrix, containing the eigenvalues of A
     np.array, size=(N, N): R, orthogonal matrix
     """
-    # return _jacobi_eigv(mat)
-    Lt, T, Rt = _householder_tridiagonal(mat)
-    if with_n_iter:
-        eigvals, Q, n_iter = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=True)
+
+    if USE_CFFI:
+        N = mat.shape[0]
+        A = mat.copy().astype(np.float32)
+        Q = np.eye(N).astype(np.float32)
+        workspace = np.zeros((N, 2 * N + 1), dtype=np.float32)
+        LIB.svd_sym(FFI.cast("float*", A.ctypes.data),
+                    FFI.cast("float*", Q.ctypes.data),
+                    FFI.cast("unsigned int", N),
+                    FFI.cast("float*", workspace.ctypes.data))
+        if with_n_iter:
+            return Q, A, Q.T, 0
+        return Q, A, Q.T
+
     else:
-        eigvals, Q = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=False)
-    D = np.diag(eigvals)
-    L = Lt @ Q
-    R = Q.T @ Rt
-    if with_n_iter:
-        return L, D, R, n_iter
-    return L, D, R
+        Lt, T, Rt = _householder_tridiagonal(mat)
+        if with_n_iter:
+            eigvals, Q, n_iter = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=True)
+        else:
+            eigvals, Q = _qr_symm_tridiag(T, epsilon=epsilon, with_n_iter=False)
+        D = np.diag(eigvals)
+        L = np.matmul(Lt, Q, dtype=np.float32)
+        R = np.matmul(Q.T, Rt, dtype=np.float32)
+        if with_n_iter:
+            return L, D, R, n_iter
+        return L, D, R
 
 
 QR_MAX_N_REPEAT = 100
@@ -337,9 +366,7 @@ def _householder_tridiagonal_c(mat):
                                 FFI.cast("unsigned int", N),
                                 FFI.cast("float*", workspace.ctypes.data))
 
-    L = Q
-    R = L.T
-    return L, T, R
+    return Q, T, Q.T
 
 
 def _vec_norm(x):
@@ -377,6 +404,12 @@ def _givens(a, b):
     float: c = cos(theta)
     float: s = sin(theta)
     """
+
+    if USE_CFFI:
+        rot = LIB.givens_rotation(FFI.cast("float", a),
+                                  FFI.cast("float", b))
+        return rot.cs, rot.sn
+
     if b == 0:
         c = np.float32(1)
         s = np.float32(0)
