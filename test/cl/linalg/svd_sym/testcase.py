@@ -5,22 +5,31 @@ This file will test the convolution implementation
 import os
 import numpy as np
 from test_utils import parse_output, TestLogger
-from header_file import HeaderFile, HeaderConstant, HeaderArray
+from header_file import HeaderFile, HeaderArray, HeaderConstant
 from makefile import Makefile
+from svd import svd
 from functional import float_as_int_repr
-from svd import _vec_norm as vec_norm
 
-TESTNAME = "cl::linalg::vnorm_f"
+TESTNAME = "cl::linalg::svd_sym"
 RESULT_FILE = "result.out"
 
 
-def gen_stimuli(N, stride=1):
+def gen_stimuli(N):
     """
     This function generates the stimuli (taken from actual data)
     """
-    a = (np.random.randn(N, stride) * 10).astype(np.float32)
-    norm = vec_norm(a[:, 0])
-    return a, norm
+    X = np.random.randn(N, 5 * N)
+    A = X @ X.T
+    assert A.shape == (N, N)
+    assert np.all(A.T == A)
+
+    A = A.astype(np.float32)
+
+    L, D, R = svd(A)
+
+    np.testing.assert_allclose(L, R.T)
+
+    return A, D, L
 
 
 def float_formatter(x):
@@ -35,27 +44,27 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for N, stride in [(8, 22), (22, 1), (22, 4)]:
+    for N in [20, 21, 22]:
 
         # generate makefile
         mkf = Makefile()
-
         mkf.add_fc_test_source("test.c")
         mkf.add_cl_test_source("cluster.c")
+        mkf.add_cl_prog_source("linalg/svd.c")
         mkf.add_cl_prog_source("linalg/matop_f.c")
-
+        mkf.add_cl_prog_source("func/copy_mat.c")
         mkf.write()
 
         # generate the stimuli
-        a, norm = gen_stimuli(N, stride)
+        A, D, Q = gen_stimuli(N)
 
         # prepare header file
         header = HeaderFile("test_stimuli.h")
         # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-        header.add(HeaderArray("a_stm", "uint32_t", a.ravel(), formatter=float_formatter))
-        header.add(HeaderArray("y_exp", "uint32_t", [norm], formatter=float_formatter))
-        header.add(HeaderConstant("DIM", N))
-        header.add(HeaderConstant("STRIDE", stride))
+        header.add(HeaderArray("a_stm", "uint32_t", A.ravel(), formatter=float_formatter))
+        header.add(HeaderArray("d_exp", "uint32_t", D.ravel(), formatter=float_formatter))
+        header.add(HeaderArray("q_exp", "uint32_t", Q.ravel(), formatter=float_formatter))
+        header.add(HeaderConstant("N_DIM", N))
         header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
         header.write()
 
@@ -65,7 +74,7 @@ def test():
         # parse output
         result = parse_output(RESULT_FILE)
 
-        casename = "N={}, stride={}".format(N, stride)
+        casename = "N={}".format(N)
 
         # log the result
         logger.show_subcase_result(casename, result)

@@ -17,6 +17,55 @@
 #define _SVD_PRECISION 1e-4f
 
 /**
+ * @brief Compute the SVD of a symmetric matrix.
+ *
+ * This function first computes a tridiagonalization using Householder reflection, and then repeats
+ * QR decomposition steps until the matrix is diagonalized.
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
+ *            contains the eigenvalues on the main diagonal.
+ * @param p_q Pointer to orthogonal transformation matrix. On entering, this matrix must either be
+ *            the unit matrix I or a different orthogonal matrix. After returning, this matrix
+ *            contains the eigenvectors of the matrix A.
+ * @param N Dimension of matrix A
+ * @param p_workspace Temporary storage required for computation, requires (N * (2N + 1) space
+ */
+void linalg_svd_sym(float* p_a,
+                    float* p_q,
+                    unsigned int N,
+                    float* p_workspace) {
+
+    // first, do householder transformation
+    linalg_householder_tridiagonal(p_a, p_q, N, p_workspace);
+
+    // next, generate main and off diagonal vectors
+    float* _p_main_diag = p_workspace;
+    float* _p_off_diag = p_workspace + N;
+
+    for (unsigned int _i = 0; _i < N - 1; _i++) {
+        _p_main_diag[_i] = p_a[_i * (N + 1)];
+        _p_off_diag[_i] = p_a[_i * (N + 1) + 1];
+    }
+    _p_main_diag[N - 1] = p_a[N * N - 1];
+
+    // do the svd of the tridiagonal matrix
+    linalg_svd_sym_tridiag(_p_main_diag, _p_off_diag, p_q, N, N, 0);
+
+    // create the diagonal matrix
+    float* _p_a_iter = p_a;
+    for (unsigned int _i = 0; _i < N; _i++) {
+        for (unsigned int _j = 0; _j < N; _j++) {
+            if (_i == _j) {
+                *_p_a_iter++ = _p_main_diag[_i];
+            } else {
+                *_p_a_iter++ = 0.f;
+            }
+        }
+    }
+
+}
+
+/**
  * @brief Compute the SVD of a symmetric tridiagonal matrix using QR decomposition:
  *
  *     A = Q D Q^T

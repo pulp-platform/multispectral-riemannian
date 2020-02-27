@@ -8,6 +8,24 @@
 #ifndef __CL_LINALG_H__
 #define __CL_LINALG_H__
 
+/**
+ * @brief Compute the SVD of a symmetric matrix.
+ *
+ * This function first computes a tridiagonalization using Householder reflection, and then repeats
+ * QR decomposition steps until the matrix is diagonalized.
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
+ *            contains the eigenvalues on the main diagonal.
+ * @param p_q Pointer to orthogonal transformation matrix. On entering, this matrix must either be
+ *            the unit matrix I or a different orthogonal matrix. After returning, this matrix
+ *            contains the eigenvectors of the matrix A.
+ * @param N Dimension of matrix A
+ * @param p_workspace Temporary storage required for computation, requires (N * (2N + 1) space
+ */
+void linalg_svd_sym(float* p_a,
+                    float* p_q,
+                    unsigned int N,
+                    float* p_workspace);
 
 /**
  * @brief Compute the SVD of a symmetric tridiagonal matrix using QR decomposition:
