@@ -92,6 +92,5 @@ void func_sos_filt_2S(const int8_t* p_x,
         _reg0 = __builtin_shuffle(_reg0, (v2s)_x0, (v2s){2, 0});
         _reg1 = __builtin_shuffle(_reg1, (v2s)_x1, (v2s){2, 0});
         _reg2 = __builtin_shuffle(_reg2, (v2s)_x2, (v2s){2, 0});
-
     }
 }

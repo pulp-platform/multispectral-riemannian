@@ -102,6 +102,35 @@ void func_copy_transpose_mat(uint32_t* p_src,
                              uint32_t* p_dst,
                              unsigned int N);
 
+/**
+ * @brief Convert int32_t to float using a multiplicative factor
+ *
+ * @param p_src Pointer to source data in int32_t, shape=[N,]
+ * @param p_dst Pointer to destination data in float, shape=[N,]
+ * @param N Number of elements to convert
+ * @param mul_factor Factor to multiply the floating point number
+ */
+void func_convert_i32_to_f(const int32_t* p_src,
+                           float* p_dst,
+                           unsigned int N,
+                           float mul_factor);
+
+/**
+ * @brief Convert float to int8_t using a multiplicative factor
+ *
+ * @param p_src Pointer to source data in float, shape=[N, M]
+ * @param p_dst Pointer to destination data in int8_t, shape=[N,M], will be aligned to [N, stride]
+ * @param N Number of rows of the matrix
+ * @param M Number of columns of the matrix
+ * @param stride Number of elements in each row, this number must be 4-aligned
+ * @param mul_factor Factor to multiply the floating point number before converting to int8_t
+ */
+void func_convert_f_to_i8(const float* p_src,
+                          int8_t* p_dst,
+                          unsigned int N,
+                          unsigned int M,
+                          unsigned int stride,
+                          float mul_factor);
 
 
 #endif //__CL_FUNC_FUNCTIONAL_H__

@@ -51,7 +51,6 @@ int do_bench(rt_perf_t* perf, int events) {
             float q_abs_diff = abs_diff(q_acq_l1[_idx], q_exp_l1[_idx]);
             max_abs_diff = insn_fmax(max_abs_diff, t_abs_diff);
             max_abs_diff = insn_fmax(max_abs_diff, q_abs_diff);
-            printf("[%2d,%2d]: T:%.2e, Q:%.2e \n", _i, _j, t_abs_diff, q_abs_diff);
         }
     }
 
@@ -79,8 +78,8 @@ void cluster_entry(void* arg) {
     // copy memory
     rt_dma_copy_t copy;
     rt_dma_memcpy((unsigned int)a_stm, (unsigned int)a_stm_l1, sizeof(a_stm), RT_DMA_DIR_EXT2LOC, 0, &copy);
-    rt_dma_memcpy((unsigned int)t_exp, (unsigned int)t_exp_l1, sizeof(t_exp), RT_DMA_DIR_EXT2LOC, 0, &copy);
-    rt_dma_memcpy((unsigned int)q_exp, (unsigned int)q_exp_l1, sizeof(q_exp), RT_DMA_DIR_EXT2LOC, 0, &copy);
+    rt_dma_memcpy((unsigned int)t_exp, (unsigned int)t_exp_l1, sizeof(t_exp), RT_DMA_DIR_EXT2LOC, 1, &copy);
+    rt_dma_memcpy((unsigned int)q_exp, (unsigned int)q_exp_l1, sizeof(q_exp), RT_DMA_DIR_EXT2LOC, 1, &copy);
     rt_dma_wait(&copy);
 
     // prepare l_acq and r_acq
