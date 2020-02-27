@@ -12,7 +12,7 @@ from golden_model import GoldenModel
 from makefile import Makefile
 import functional as F
 
-TESTNAME = "cl::func::swap_mat"
+TESTNAME = "cl::func::copy_mat"
 RESULT_FILE = "result.out"
 
 MODEL_FILENAME = "../../../../data/model.pkl"

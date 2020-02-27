@@ -93,6 +93,8 @@ class Makefile:
             ret += "PULP_LDFLAGS += -lplpdsp\n"
 
         ret += "PULP_CFLAGS = -O3 -g \n\n"
+        # link math library
+        ret += "PULP_LDFLAGS += -lm\n\n"
 
         # Enable FMA
         if self.use_fma:
@@ -104,7 +106,6 @@ class Makefile:
             ret += "# Disable SQRT/DIV unit\n"
             ret += "PULP_CFLAGS += -DUSE_SOFT_SQRTDIV\n"
             ret += "PULP_CFLAGS += -mno-fdiv\n"
-            ret += "PULP_LDFLAGS += -lm\n\n"
 
         # add compiler flags
         ret += "\n".join(["PULP_CFLAGS += -D{}".format(define) for define in self.defines])

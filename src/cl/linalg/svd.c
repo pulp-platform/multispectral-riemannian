@@ -15,6 +15,59 @@
 #define _SQRT2 1.41421353816986083984f
 #define _EPSILON 1.1920928955078125e-7f // smallest e, s.t. 1 + e > 1 (from numpy)
 #define _SVD_PRECISION 1e-4f
+#define _MIN_ALLOWED_EIGENVALUE 1.e-3f
+
+/**
+ * @brief Compute the matrix logarithm of a matrix by computing the SVD first.
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
+ *            contains the matrix logarithm of A
+ * @param N Dimension of matrix A
+ * @param p_workspace Temporary storage required for computation, requires (N * (3N + 1) space
+ */
+void linalg_logm(float* p_a,
+                 unsigned int N,
+                 float* p_workspace) {
+
+    float* _p_q = p_workspace;
+    float* _p_hh_workspace = p_workspace + N * N;
+
+    // fill _p_q with unit matrix
+    linalg_fill_I(_p_q, N);
+
+    // compute the householder reflection
+    linalg_householder_tridiagonal(p_a, _p_q, N, _p_hh_workspace);
+
+    // next, generate main and off diagonal vectors
+    float* _p_main_diag = p_workspace + N * N;
+    float* _p_off_diag = p_workspace + N * (N + 1);
+
+    for (unsigned int _i = 0; _i < N - 1; _i++) {
+        _p_main_diag[_i] = p_a[_i * (N + 1)];
+        _p_off_diag[_i] = p_a[_i * (N + 1) + 1];
+    }
+    _p_main_diag[N - 1] = p_a[N * N - 1];
+
+    // do the svd of the tridiagonal matrix
+    linalg_svd_sym_tridiag(_p_main_diag, _p_off_diag, _p_q, N, N, 0);
+
+    // compute the logarithm of all eigenvalues
+    for (unsigned int _i = 0; _i < N; _i++) {
+        float _val = _p_main_diag[_i];
+        _val = insn_fmax(_MIN_ALLOWED_EIGENVALUE, _val); // clip the eigenvalues
+        _p_main_diag[_i] = logf(_val);
+    }
+
+    // reconstruct the matrix
+    float* _p_construction = p_workspace + N * (N + 2);
+    // transpose matrix q to copy it to _p_construction
+    func_copy_transpose_mat((uint32_t*)_p_q, (uint32_t*)_p_construction, N);
+    // multiply _p_q with the log of the eigenvalues
+    linalg_matmul_diag_f(_p_q, _p_main_diag, N);
+    // do the final matrix multiplication of p_q and p_construction and store the results in p_a
+    linalg_matmul_f(_p_q, _p_construction, N, N, N, p_a);
+
+}
 
 /**
  * @brief Compute the SVD of a symmetric matrix.
