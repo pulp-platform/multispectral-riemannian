@@ -21,7 +21,7 @@ def gen_stimuli(N):
     """
     This function generates the stimuli
     """
-    scale = random.uniform(1, 2)
+    scale = np.float32(random.uniform(1, 2))
     A_f = np.random.uniform(-1, 1, (N, N))
     A_f = (A_f * scale).astype(np.float32)
     A_i = F.quantize_to_int(A_f, scale, n_bits=32)

@@ -22,7 +22,8 @@ def gen_stimuli():
     a = np.random.randn(NUM_TEST).astype(np.float32)
     b = np.random.randn(NUM_TEST).astype(np.float32)
     c = np.abs(np.random.randn(NUM_TEST)).astype(np.float32)
-    return a, b, c
+    d = np.random.randint(-(1 << 31), (1 << 31) - 1, (NUM_TEST, )).astype(int)
+    return a, b, c, d
 
 
 def float_formatter(x):
@@ -65,7 +66,7 @@ def test():
     mkf.write()
 
     # generate the stimuli
-    a, b, c = gen_stimuli()
+    a, b, c, d = gen_stimuli()
 
     # prepare header file
     header = HeaderFile("test_stimuli.h")
@@ -73,6 +74,7 @@ def test():
     header.add(HeaderArray("a_stm", "uint32_t", a.ravel(), formatter=float_formatter))
     header.add(HeaderArray("b_stm", "uint32_t", b.ravel(), formatter=float_formatter))
     header.add(HeaderArray("c_stm", "uint32_t", c.ravel(), formatter=float_formatter))
+    header.add(HeaderArray("d_stm", "int32_t", d.ravel()))
     header.add(HeaderConstant("LENGTH", NUM_TEST))
     header.write()
 
@@ -92,6 +94,7 @@ def test():
     compare_result(result, "msub", (a * b) - c, rel_tol=logger.epsilon)
     compare_result(result, "nmadd", -((a * b) + c), rel_tol=logger.epsilon)
     compare_result(result, "nmsub", -((a * b) - c), rel_tol=logger.epsilon)
+    compare_result(result, "fcvt", d.astype(np.float32), rel_tol=logger.epsilon)
 
     subcase_name = "FPU"
 
