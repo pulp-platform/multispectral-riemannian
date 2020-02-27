@@ -9,6 +9,18 @@
 #define __CL_LINALG_H__
 
 /**
+ * @brief Compute the matrix logarithm of a matrix by computing the SVD first.
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
+ *            contains the matrix logarithm of A
+ * @param N Dimension of matrix A
+ * @param p_workspace Temporary storage required for computation, requires (N * (3N + 1) space
+ */
+void linalg_logm(float* p_a,
+                 unsigned int N,
+                 float* p_workspace);
+
+/**
  * @brief Compute the SVD of a symmetric matrix.
  *
  * This function first computes a tridiagonalization using Householder reflection, and then repeats
@@ -208,21 +220,6 @@ void linalg_matmul_stride_f(const float* p_a,
                             float* p_y);
 
 /**
- * @brief Applies the givens rotation on matrix A
- *
- * @warning this funciton operates inplace
- *
- * @param p_a Pointer to matrix A of shape [N, N], will be modified
- * @param rot Rotation structure
- * @param k Position of the rotation, 0 <= k < N-1
- * @param N Dimension of matrix a
- */
-void linalg_apply_givens_rotation_f(float* p_a,
-                                    linalg_givens_rotation_t rot,
-                                    unsigned int k,
-                                    unsigned int N);
-
-/**
  * @brief Compute the matrix multiplication of two floating point matrices
  *
  * @warning p_y must already be allocated, use L1 memory!
@@ -278,6 +275,36 @@ void linalg_matmul_T_f(const float* p_a,
                        unsigned int N,
                        unsigned int O,
                        float* p_y);
+
+/**
+ * @brief computes the matrix multiplication of a matrix A and a diagonal matrix D.
+ *
+ *     A <-- A @ D
+ *
+ * @warning The matrix A will be overwritten with the result
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], will be overwritten
+ * @param p_diag Pointer to diagonal vector of matrix D, of shape [N]
+ * @param N Dimension of the matrix A and length of diagonal vector D
+ */
+void linalg_matmul_diag_f(float* p_a,
+                          const float* p_diag,
+                          unsigned int N);
+
+/**
+ * @brief Applies the givens rotation on matrix A
+ *
+ * @warning this funciton operates inplace
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], will be modified
+ * @param rot Rotation structure
+ * @param k Position of the rotation, 0 <= k < N-1
+ * @param N Dimension of matrix a
+ */
+void linalg_apply_givens_rotation_f(float* p_a,
+                                    linalg_givens_rotation_t rot,
+                                    unsigned int k,
+                                    unsigned int N);
 
 /**
  * @brief Computes the transpose of a symmetric matrix A in place

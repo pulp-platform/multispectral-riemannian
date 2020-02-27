@@ -387,6 +387,66 @@ void linalg_matmul_T_f(const float* p_a,
 }
 
 /**
+ * @brief computes the matrix multiplication of a matrix A and a diagonal matrix D.
+ *
+ *     A <-- A @ D
+ *
+ * @warning The matrix A will be overwritten with the result
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], will be overwritten
+ * @param p_diag Pointer to diagonal vector of matrix D, of shape [N]
+ * @param N Dimension of the matrix A and length of diagonal vector D
+ */
+void linalg_matmul_diag_f(float* p_a,
+                          const float* p_diag,
+                          unsigned int N) {
+
+    float* _p_a_iter = p_a;
+    const float* _p_diag_iter = p_diag;
+
+    float _diag;
+    float _val0, _val1, _val2, _val3;
+
+    unsigned int num_blk = N / 4;
+    unsigned int rem_blk = N % 4;
+
+    for (unsigned int _i = 0; _i < N; _i++) {
+
+        // load the current diagonal element
+        _diag = *_p_diag_iter++;
+        _p_a_iter = p_a + _i;
+
+        for (unsigned int _j = 0; _j < num_blk; _j++) {
+            _val0 = *(_p_a_iter + 0 * N);
+            _val1 = *(_p_a_iter + 1 * N);
+            _val2 = *(_p_a_iter + 2 * N);
+            _val3 = *(_p_a_iter + 3 * N);
+
+            _val0 = _diag * _val0;
+            _val1 = _diag * _val1;
+            _val2 = _diag * _val2;
+            _val3 = _diag * _val3;
+
+            *(_p_a_iter + 0 * N) = _val0;
+            *(_p_a_iter + 1 * N) = _val1;
+            *(_p_a_iter + 2 * N) = _val2;
+            *(_p_a_iter + 3 * N) = _val3;
+
+            _p_a_iter += 4 * N;
+        }
+
+        for (unsigned int _j = 0; _j < rem_blk; _j++) {
+            _val0 = *_p_a_iter;
+            _val0 = _diag * _val0;
+            *_p_a_iter = _val0;
+            _p_a_iter += N;
+        }
+
+    }
+
+}
+
+/**
  * @brief compute vector covariance matrix.
  *
  * @warning p_y must already be allocated, use L1 memory!
