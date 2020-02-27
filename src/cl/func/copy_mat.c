@@ -54,3 +54,42 @@ void func_copy_mat(uint32_t* p_src,
     }
 
 }
+
+/**
+ * @brief Copy matrices A to B and transposes it
+ *
+ * @param p_src Pointer to matrix A of shape [N, N]
+ * @param p_dst Pointer to matrix B of shape [N, N]
+ * @param N number of rows of the two matrices
+ */
+void func_copy_transpose_mat(uint32_t* p_src,
+                             uint32_t* p_dst,
+                             unsigned int N) {
+
+    uint32_t* _p_src_iter = p_src;
+    uint32_t* _p_dst_iter;
+
+    uint32_t _val_a, _val_b;
+
+    unsigned int _num_block = N / 2;
+    unsigned int _rem_block = N % 2;
+
+    for (int _n = 0; _n < N; _n++) {
+
+        _p_dst_iter = p_dst + _n;
+
+        for (int _m = 0; _m < _num_block; _m++) {
+            _val_a = *_p_src_iter++;
+            _val_b = *_p_src_iter++;
+            *(_p_dst_iter + 0 * N) = _val_a;
+            *(_p_dst_iter + 1 * N) = _val_b;
+            _p_dst_iter += 2 * N;
+        }
+
+        if (_rem_block != 0) {
+            *_p_dst_iter++ = *_p_src_iter++;
+            _p_dst_iter += N;
+        }
+    }
+
+}

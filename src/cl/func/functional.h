@@ -91,6 +91,17 @@ void func_copy_mat(uint32_t* p_src,
                    unsigned int stride_src,
                    unsigned int stride_dst);
 
+/**
+ * @brief Copy matrices A to B and transposes it
+ *
+ * @param p_src Pointer to matrix A of shape [N, N]
+ * @param p_dst Pointer to matrix B of shape [N, N]
+ * @param N number of rows of the two matrices
+ */
+void func_copy_transpose_mat(uint32_t* p_src,
+                             uint32_t* p_dst,
+                             unsigned int N);
+
 
 
 #endif //__CL_FUNC_FUNCTIONAL_H__
