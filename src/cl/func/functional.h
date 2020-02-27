@@ -155,5 +155,35 @@ void func_covmat_reg(const int8_t* p_x,
                      unsigned int y_shift,
                      int16_t* p_y);
 
+/**
+ * @brief compute matrix multiplication of two square int16 matrices
+ *
+ * @warning N must be even! Also, p_y must already be allocated
+ *
+ * @param p_a Pointer to matrix A, of shape [N, N]
+ * @param p_b Pointer to matrix B, of shape [N, N]
+ * @param N Dimensionality of matrices
+ * @param p_y Pointer to matrix Y, of shape [N, N]
+ */
+void func_matmul_sqr_i16(const int16_t* p_a,
+                         const int16_t* p_b,
+                         unsigned int N,
+                         int32_t* p_y);
+
+/**
+ * @brief compute matrix multiplication of two square int32 matrices
+ *
+ * @warning p_y must already be allocated
+ *
+ * @param p_a Pointer to matrix A, of shape [N, N]
+ * @param p_b Pointer to matrix B, of shape [N, N]
+ * @param N Dimensionality of matrices
+ * @param p_y Pointer to matrix Y, of shape [N, N]
+ */
+void func_matmul_sqr_i32(const int32_t* p_a,
+                         const int32_t* p_b,
+                         unsigned int N,
+                         int32_t* p_y);
+
 
 #endif //__CL_FUNC_FUNCTIONAL_H__
