@@ -132,5 +132,28 @@ void func_convert_f_to_i8(const float* p_src,
                           unsigned int stride,
                           float mul_factor);
 
+/**
+ * @brief compute the regularized covariance matrix of a matrix X.
+ *
+ *     Y = X @ X.T
+ *
+ * @warning p_y must already be allocated on L1
+ *
+ * @param p_x Pointer to matrix X of shape [N, M]
+ * @param rho Regularization parameter, added to the main diagonal elements
+ * @param M Number of columns of matrix X
+ * @param N Number of rows of matrix X and dimensionality of matrix Y
+ * @param N_align Number of 2-aligned columns of matrix Y
+ * @param y_shift Number of bits to shift to the right to store Y
+ * @param p_y Pointer to output matrix Y of shape [N, N_align]
+ */
+void func_covmat_reg(const int8_t* p_x,
+                     int32_t rho,
+                     unsigned int M,
+                     unsigned int N,
+                     unsigned int N_align,
+                     unsigned int y_shift,
+                     int16_t* p_y);
+
 
 #endif //__CL_FUNC_FUNCTIONAL_H__
