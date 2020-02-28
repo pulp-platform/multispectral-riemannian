@@ -98,13 +98,27 @@ class HeaderStruct(HeaderEntry):
         max_len = max([len(str(v)) for v in self.data.values()])
         max_len += 1
 
-        ret = "const {} {} = {{\n".format(self.struct_type, self.name)
-        for key, value in self.data.items():
-            val_colon = "{},".format(value).ljust(max_len, ' ')
-            ret += "{}{} //{}\n".format(TAB, val_colon, key)
-        ret += "};\n"
+        ret = "const {} {} = {};\n".format(self.struct_type, self.name, self.initializer_str())
         if self.blank_line:
             ret += "\n"
+        return ret
+
+    def initializer_str(self, double_tab=False):
+        max_len = max([len(str(v)) for v in self.data.values()])
+        max_len += 1
+
+        item_tab = TAB
+        if double_tab:
+            item_tab = TAB + TAB
+
+        ret = "{\n"
+        for key, value in self.data.items():
+            val_colon = "{},".format(value).ljust(max_len, ' ')
+            ret += "{}{} //{}\n".format(item_tab, val_colon, key)
+        if double_tab:
+            ret += "{}}}".format(TAB)
+        else:
+            ret += "}"
         return ret
 
 
@@ -140,24 +154,26 @@ class HeaderInclude(HeaderEntry):
 
 
 class HeaderScalar(HeaderEntry):
-    def __init__(self, name, dtype, value, blank_line=True):
+    def __init__(self, name, dtype, value, const=True, blank_line=True):
         self.name = name
         self.dtype = dtype
         self.value = value
+        self.const = const
+        self.const_str = "const " if self.const else ""
         self.blank_line = blank_line
 
     def header_str(self, with_c=False):
         if with_c:
-            ret = "extern const {} {};\n".format(self.dtype, self.name, self.value)
+            ret = "extern {}{} {};\n".format(self.const_str, self.dtype, self.name, self.value)
         else:
-            ret = "const {} {} = {};\n".format(self.dtype, self.name, self.value)
+            ret = "{}{} {} = {};\n".format(self.const_str, self.dtype, self.name, self.value)
 
         if self.blank_line:
             ret += "\n"
         return ret
 
     def source_str(self):
-        ret = "const {} {} = {};\n".format(self.dtype, self.name, self.value)
+        ret = "{}{} {} = {};\n".format(self.const_str, self.dtype, self.name, self.value)
         if self.blank_line:
             ret += "\n"
         return ret
@@ -165,7 +181,7 @@ class HeaderScalar(HeaderEntry):
 
 class HeaderArray(HeaderEntry):
     def __init__(self, name, dtype, data, locality="RT_L2_DATA", blank_line=True, const=True,
-                 formatter=str):
+                 formatter=str, skip_format=False):
         assert locality in ["RT_LOCAL_DATA", "RT_L2_DATA", "RT_CL_DATA", "RT_FC_SHARED_DATA",
                             "RT_FC_GLOBAL_DATA", ""]
         self.name = name
@@ -175,6 +191,7 @@ class HeaderArray(HeaderEntry):
         self.const = const
         self.blank_line = blank_line
         self.formatter = formatter
+        self.skip_format = skip_format
 
     def header_str(self, with_c=False):
         const_str = "const " if self.const else ""
@@ -195,11 +212,15 @@ class HeaderArray(HeaderEntry):
             ret = ""
             ret += "{} {}{} {}[] = {{\n".format(self.locality, const_str, self.dtype, self.name)
 
-            long_str = ", ".join([self.formatter(item) for item in self.data])
-            parts = wrap(long_str, MAX_WIDTH-len(TAB))
-            ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
+            if self.skip_format:
+                ret += TAB
+                ret += ",\n{}".format(TAB).join(self.data)
+            else:
+                long_str = ", ".join([self.formatter(item) for item in self.data])
+                parts = wrap(long_str, MAX_WIDTH-len(TAB))
+                ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
 
-            ret += "};\n"
+            ret += "\n};\n"
 
         if self.blank_line:
             ret += "\n"
@@ -221,11 +242,15 @@ class HeaderArray(HeaderEntry):
         ret = ""
         ret += "{} {}{} {}[] = {{\n".format(self.locality, const_str, self.dtype, self.name)
 
-        long_str = ", ".join([self.formatter(item) for item in self.data])
-        parts = wrap(long_str, MAX_WIDTH-len(TAB))
-        ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
+        if self.skip_format:
+            ret += TAB
+            ret += ",\n{}".format(TAB).join(self.data)
+        else:
+            long_str = ", ".join([self.formatter(item) for item in self.data])
+            parts = wrap(long_str, MAX_WIDTH-len(TAB))
+            ret += "{}{}".format(TAB, "\n{}".format(TAB).join(parts))
 
-        ret += "};\n"
+        ret += "\n};\n"
         if self.blank_line:
             ret += "\n"
         return ret

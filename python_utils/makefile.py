@@ -53,14 +53,14 @@ class Makefile:
     def add_fc_prog_source(self, name):
         """ add source file from the actual program, starting at root/src/fc/ """
         source_file = os.path.join(self.project_root, "src/fc", name)
-        assert os.path.exists(source_file)
+        assert os.path.exists(source_file), "Could not find FC source file: {}".format(source_file)
         assert source_file.endswith(".c")
         self.cl_sources.append(source_file)
 
     def add_cl_prog_source(self, name):
         """ add source file from the actual program, starting at root/src/cl/ """
         source_file = os.path.join(self.project_root, "src/cl", name)
-        assert os.path.exists(source_file)
+        assert os.path.exists(source_file), "Could not find CL source file: {}".format(source_file)
         assert source_file.endswith(".c")
         self.cl_sources.append(source_file)
 

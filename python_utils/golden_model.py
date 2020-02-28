@@ -289,7 +289,7 @@ class Filter(Block):
         if is_full_name:
             name = base_name
         else:
-            name = f"{base_name}_filter_{self.freq_idx}"
+            name = f"{base_name}_filter_param_{self.freq_idx}"
         # First, add a comment
         header_file.add(HeaderComment(f"Filter Coefficients for frequency id: {self.freq_idx}",
                                       mode="//", blank_line=False))
@@ -307,6 +307,22 @@ class Filter(Block):
         struct['shift_b1'] = f"{self.shift_b[2]}"
         struct['y_shift'] = f"{-self.shift_y}"
         header_file.add(HeaderStruct(name, "func_sos_filt_2S_params_t", struct))
+
+    def get_initializer_str(self, double_tab=False):
+        struct = OrderedDict()
+        struct['a01'] = f"((v2s){{ {self.coeff_a[1, 1]}, {self.coeff_a[1, 2]} }})"
+        struct['a11'] = f"((v2s){{ {self.coeff_a[2, 1]}, {self.coeff_a[2, 2]} }})"
+        struct['b00'] = f"{self.coeff_b[1, 0]}"
+        struct['b01'] = f"((v2s){{ {self.coeff_b[1, 1]}, {self.coeff_b[1, 2]} }})"
+        struct['b10'] = f"{self.coeff_b[2, 0]}"
+        struct['b11'] = f"((v2s){{ {self.coeff_b[2, 1]}, {self.coeff_b[2, 2]} }})"
+        struct['shift_a0'] = f"{self.shift_a[1]}"
+        struct['shift_a1'] = f"{self.shift_a[2]}"
+        struct['shift_b0'] = f"{self.shift_b[1]}"
+        struct['shift_b1'] = f"{self.shift_b[2]}"
+        struct['y_shift'] = f"{-self.shift_y}"
+        s = HeaderStruct("only_initializer_str", "func_sos_filt_2S_params_t", struct)
+        return s.initializer_str(double_tab=double_tab)
 
 
 class CovMat(Block):

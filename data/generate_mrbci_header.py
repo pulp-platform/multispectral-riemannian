@@ -13,7 +13,7 @@ __date__ = "2020/02/28"
 import argparse
 import numpy as np
 from header_file import HeaderFile, HeaderConstant, HeaderArray, HeaderComment, HeaderScalar, \
-    align_array, align_array_size
+    HeaderInclude, HeaderStruct, align_array, align_array_size
 from golden_model import GoldenModel
 import functional as F
 
@@ -39,24 +39,27 @@ def generate_mrbci_header(model_filename: str = DEFAULT_MODEL_FILENAME,
     assert C % 2 == 0
 
     # prepare the header file
-    header_file = HeaderFile(output_filename, with_c=True)
+    header_file = HeaderFile(output_filename, with_c=True, define_guard="__CL_MRBCI_PARAMS_H__")
+    header_file.add(HeaderInclude("../func/functional.h"))
+    header_file.add(HeaderInclude("../linalg/linalg.h"))
     header_file.add(HeaderComment("Multiscale Riemannian Brain Computer Interface", mode="/*"))
 
     # add dimensions
     header_file.add(HeaderComment("Dimensionality", blank_line=True))
     header_file.add(HeaderConstant("MRBCI_T", T, blank_line=False))
+    header_file.add(HeaderConstant("MRBCI_T_ALIGN", align_array_size(T), blank_line=False))
     header_file.add(HeaderConstant("MRBCI_C", C, blank_line=False))
+    header_file.add(HeaderConstant("MRBCI_C_ALIGN", align_array_size(C), blank_line=False))
     header_file.add(HeaderConstant("MRBCI_NUM_FREQ", model.n_freq, blank_line=False))
     header_file.add(HeaderConstant("MRBCI_NUM_CLASS", model.output_shape[0], blank_line=True))
 
     # filters
     header_file.add(HeaderComment("Filters", blank_line=True, mode="/*"))
     # generate all structs
-    any(map(lambda x: x.filter.add_header_entries(header_file, "mrbci"),
-            model.feature_extraction.freq_band))
-    # generate an array containing the pointers to those structs
-    filter_pointers = ["&mrbci_filter_{}".format(i) for i in range(model.n_freq)]
-    header_file.add(HeaderArray("mrbci_filters", "func_sos_filt_2S_params_t*", filter_pointers))
+    structs = [band.filter.get_initializer_str(double_tab=True)
+               for band in model.feature_extraction.freq_band]
+    header_file.add(HeaderArray("mrbci_filter_params", "func_sos_filt_2S_params_t", structs,
+                                skip_format=True))
 
     # CovMat
     header_file.add(HeaderComment("CovMat", mode="/*", blank_line=True))
@@ -80,10 +83,8 @@ def generate_mrbci_header(model_filename: str = DEFAULT_MODEL_FILENAME,
     requant_factor = np.float32((1 << 7) / first_band.logm.output_scale)
     header_file.add(HeaderArray("mrbci_logm_dequant_i", "uint32_t", dequant_array,
                                 formatter=float_formatter, blank_line=False))
-    header_file.add(HeaderScalar("mrbci_logm_dequant", "float*", "(float*)mrbci_logm_dequant_i"))
     header_file.add(HeaderScalar("mrbci_logm_requant_i", "uint32_t",
                                  float_formatter(requant_factor), blank_line=False))
-    header_file.add(HeaderScalar("mrbci_logm_requant", "float", "*((float*)&mrbci_logm_requant_i)"))
 
     # half diagonalization
     header_file.add(HeaderComment("Half Diagonalization", mode="/*", blank_line=True))
