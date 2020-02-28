@@ -292,7 +292,7 @@ class Filter(Block):
             name = f"{base_name}_filter_{self.freq_idx}"
         # First, add a comment
         header_file.add(HeaderComment(f"Filter Coefficients for frequency id: {self.freq_idx}",
-                                      mode="/*"))
+                                      mode="//", blank_line=False))
         # add the struct
         struct = OrderedDict()
         struct['a01'] = f"((v2s){{ {self.coeff_a[1, 1]}, {self.coeff_a[1, 2]} }})"

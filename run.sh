@@ -24,26 +24,6 @@ while getopts "bp:nwtfde:h" name; do
     esac
 done
 
-# search for a virtual environment
-# if [ -e multiscale_bci_python/env/bin/activate ]; then
-#     printf "activating multiscale_bci_python/env\n"
-#     source multiscale_bci_python/env/bin/activate
-# elif [ -e multiscale_bci_python/venv/bin/activate ]; then
-#     printf "activating multiscale_bci_python/venv\n"
-#     source multiscale_bci_python/env/bin/activate
-# elif [ -e multiscale_bci_python/virtualenv/bin/activate ]; then
-#     printf "activating multiscale_bci_python/virtualenv\n"
-#     source multiscale_bci_python/env/bin/activate
-# else
-#     read -s "Please enter the path to a virtual environment (including /bin/activate)\n> " VIRTUAL_ENVIRONMENT_PATH
-#     if [ -e $VIRTUAL_ENVIRONMENT_PATH ]; then
-#         source $VIRTUAL_ENVIRONMENT_PATH
-#     else
-#         printf "Virtual environment could not be found!"
-#         exit 1
-#     fi
-# fi
-
 
 if [ "$TRAIN" = true ]; then
     printf "Training the network...\n\n"
@@ -68,14 +48,14 @@ cd python_utils
 make
 cd ..
 
-# enter data directory
-cd data
-
 # add python_utils to the python path
 export PYTHONPATH=$(pwd)/python_utils:$(pwd)/multiscale_bci_python:$PYTHONPATH
 
+# enter data directory
+cd data
+
 # generate net header file
-# python3 gen_net_header.py
+python3.8 generate_mrbci_header.py
 # python3 gen_input_header.py
 
 # leave data directory

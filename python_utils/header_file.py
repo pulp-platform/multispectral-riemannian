@@ -239,7 +239,7 @@ class HeaderComment(HeaderEntry):
         self.blank_line = blank_line
 
     def header_str(self, with_c=False):
-        if self.mode == "/":
+        if self.mode == "//":
             start = "// "
             mid = "\n// "
             end = ""
