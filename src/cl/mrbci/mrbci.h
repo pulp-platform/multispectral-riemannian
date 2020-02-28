@@ -79,4 +79,15 @@ void mrbci_logm(int32_t* p_in,
                 int8_t* p_out,
                 float* p_workspace);
 
+/**
+ * @brief Convert the upper right half of the matrix into a 
+ *
+ * @warning p_in and p_out should be placed on L1, and be allocated
+ *
+ * @param p_in Pointer to input matrix of shape [C, C_ALIGN], is destroyed in this function
+ * @param p_out Pointer to output data, must at least MRBCI_HALF_DIAG_FEATURES space
+ */
+void mrbci_half_diag(const int8_t* p_in,
+                     int8_t* p_out);
+
 #endif//__CL_MRBCI_H__

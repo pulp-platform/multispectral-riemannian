@@ -88,6 +88,8 @@ def generate_mrbci_header(model_filename: str = DEFAULT_MODEL_FILENAME,
 
     # half diagonalization
     header_file.add(HeaderComment("Half Diagonalization", mode="/*", blank_line=True))
+    header_file.add(HeaderConstant("MRBCI_HALF_DIAG_FEATURES",
+                                   first_band.half_diag.output_shape[0]))
     header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SQRT2", first_band.half_diag.sqrt2))
     header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SHIFT", first_band.half_diag.bitshift_scale))
     header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SHIFT_DIAG",
