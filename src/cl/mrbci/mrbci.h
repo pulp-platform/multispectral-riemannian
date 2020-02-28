@@ -36,9 +36,8 @@ void mrbci_filter(const int8_t* p_in,
                   unsigned int freq_idx,
                   int8_t* p_out);
 
-
 /**
- * @brief Apply the FIR filter for a given frequency
+ * @brief Apply compute the regularized covariance matrix of the filtered data
  *
  * @warning p_in and p_out should be placed on L1, and be allocated
  *
@@ -49,5 +48,20 @@ void mrbci_filter(const int8_t* p_in,
 void mrbci_covmat(const int8_t* p_in,
                   unsigned int freq_idx,
                   int16_t* p_out);
+
+/**
+ * @brief Apply the whitening transform (two matrix multiplications)
+ *
+ * @warning p_in, p_workspace and p_out should be placed on L1, and be allocated
+ *
+ * @param p_in Pointer to input matrix of shape [C, C], aligned to [C, C] (assuming C is even)
+ * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
+ * @param p_out Pointer to output data of shape [C, C]
+ * @param p_workspace Pointer to temporary workspace data of shape [C, C]
+ */
+void mrbci_whitening(const int16_t* p_in,
+                     unsigned int freq_idx,
+                     int32_t* p_out,
+                     int32_t* p_workspace);
 
 #endif//__CL_MRBCI_H__
