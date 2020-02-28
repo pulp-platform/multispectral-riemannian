@@ -64,4 +64,19 @@ void mrbci_whitening(const int16_t* p_in,
                      int32_t* p_out,
                      int32_t* p_workspace);
 
+/**
+ * @brief Apply the Matrix Logarithm
+ *
+ * @warning p_in, p_workspace and p_out should be placed on L1, and be allocated
+ *
+ * @param p_in Pointer to input matrix of shape [C, C], is destroyed in this function
+ * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
+ * @param p_out Pointer to output data of shape [C, C], aligned to [C, C_ALIGN]
+ * @param p_workspace Pointer to temporary workspace data of shape [C, 3*C + 1]
+ */
+void mrbci_logm(int32_t* p_in,
+                unsigned int freq_idx,
+                int8_t* p_out,
+                float* p_workspace);
+
 #endif//__CL_MRBCI_H__
