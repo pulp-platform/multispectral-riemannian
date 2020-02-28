@@ -32,8 +32,22 @@ void mrbci_init();
  * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
  * @param p_out Pointer to output data of shape [C, T], aligned to [C, T_ALIGN]
  */
-void mrbci_filter(int8_t* p_in,
+void mrbci_filter(const int8_t* p_in,
                   unsigned int freq_idx,
                   int8_t* p_out);
+
+
+/**
+ * @brief Apply the FIR filter for a given frequency
+ *
+ * @warning p_in and p_out should be placed on L1, and be allocated
+ *
+ * @param p_in Pointer to filtered input data of shape [C, T], aligned to [C, T_ALIGN]
+ * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
+ * @param p_out Pointer to output data of shape [C, C], aligned to [C, C] (assuming C is even)
+ */
+void mrbci_covmat(const int8_t* p_in,
+                  unsigned int freq_idx,
+                  int16_t* p_out);
 
 #endif//__CL_MRBCI_H__

@@ -6,7 +6,6 @@
  */
 
 #include "mrbci.h"
-#include "mrbci_params.h"
 #include "../func/functional.h"
 
 /**
@@ -18,7 +17,7 @@
  * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
  * @param p_out Pointer to output data of shape [C, T], aligned to [C, T_ALIGN]
  */
-void mrbci_filter(int8_t* p_in,
+void mrbci_filter(const int8_t* p_in,
                   unsigned int freq_idx,
                   int8_t* p_out) {
 
