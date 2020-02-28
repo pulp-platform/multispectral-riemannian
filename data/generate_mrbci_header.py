@@ -84,15 +84,14 @@ def generate_mrbci_header(model_filename: str = DEFAULT_MODEL_FILENAME,
     header_file.add(HeaderArray("mrbci_logm_dequant_i", "uint32_t", dequant_array,
                                 formatter=float_formatter, blank_line=False))
     header_file.add(HeaderScalar("mrbci_logm_requant_i", "uint32_t",
-                                 float_formatter(requant_factor), blank_line=False))
+                                 float_formatter(requant_factor), blank_line=True))
 
     # half diagonalization
     header_file.add(HeaderComment("Half Diagonalization", mode="/*", blank_line=True))
     header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SQRT2", first_band.half_diag.sqrt2))
-    header_file.add(HeaderScalar("mrbci_half_diag_shift", "unsigned int",
-                                 first_band.half_diag.bitshift_scale))
-    header_file.add(HeaderScalar("mrbci_half_diag_shift_diag", "unsigned int",
-                                 first_band.half_diag.bitshift_scale_diag))
+    header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SHIFT", first_band.half_diag.bitshift_scale))
+    header_file.add(HeaderConstant("MRBCI_HALF_DIAG_SHIFT_DIAG",
+                                   first_band.half_diag.bitshift_scale_diag))
 
     # SVM
     header_file.add(HeaderComment("Support Vector Machine", mode="/*", blank_line=True))
