@@ -615,11 +615,13 @@ void linalg_vecmatmul_f(const float* p_a,
  *
  * @param p_a Pointer to vector a of shape [N]
  * @param N Columns of matrix A and B
+ * @param stride Line width of the output matrix Y
  * @param store 0: store everything, 1: store upper right half only, 2: store lower left half only
  * @param p_y Pointer to matrix Y = aa^T of shape [N, N], assuming a is a column vector
  */
 void linalg_vcovmat_f(const float* p_a,
                       unsigned int N,
+                      unsigned int stride,
                       unsigned int store,
                       float* p_y) {
 
@@ -641,8 +643,8 @@ void linalg_vcovmat_f(const float* p_a,
         for (int _i = 0; _i < N; _i++) {
 
             // prepare the iterators
-            _p_y_iter1 = p_y + _i * (N + 1);
-            _p_y_iter2 = _p_y_iter1 + N;
+            _p_y_iter1 = p_y + _i * (stride + 1);
+            _p_y_iter2 = _p_y_iter1 + stride;
             _p_a_iter2 = _p_a_iter1 + 1;
 
             // load the first value, which is constant for this entire cycle
@@ -657,7 +659,7 @@ void linalg_vcovmat_f(const float* p_a,
                 *_p_y_iter1 = _val_y;
                 *_p_y_iter2 = _val_y;
                 _p_y_iter1 += 1;
-                _p_y_iter2 += N;
+                _p_y_iter2 += stride;
             }
         }
 
@@ -672,7 +674,7 @@ void linalg_vcovmat_f(const float* p_a,
         for (int _i = 0; _i < N; _i++) {
 
             // prepare the iterators
-            _p_y_iter = p_y + _i * (N + 1);
+            _p_y_iter = p_y + _i * (stride + 1);
             _p_a_iter2 = _p_a_iter1 + 1;
 
             // load the first value, which is constant for this entire cycle
@@ -690,7 +692,7 @@ void linalg_vcovmat_f(const float* p_a,
     } else if (store == 2) {
 
         /*
-         * Store only the upper half of the values
+         * Store only the lower left half of the values
          */
 
         float* _p_y_iter;
@@ -698,7 +700,7 @@ void linalg_vcovmat_f(const float* p_a,
         for (int _i = 0; _i < N; _i++) {
 
             // prepare the iterators
-            _p_y_iter = p_y + _i * (N + 1);
+            _p_y_iter = p_y + _i * (stride + 1);
             _p_a_iter2 = _p_a_iter1 + 1;
 
             // load the first value, which is constant for this entire cycle
@@ -706,12 +708,12 @@ void linalg_vcovmat_f(const float* p_a,
 
             // compute the diagonal element and store back
             *_p_y_iter = _val_a * _val_a;
-            _p_y_iter += N;
+            _p_y_iter += stride;
 
             // compute the remaining elements
             for (int _j = _i + 1; _j < N; _j++) {
                 *_p_y_iter = _val_a * (*_p_a_iter2++);
-                _p_y_iter += N;
+                _p_y_iter += stride;
             }
         }
 

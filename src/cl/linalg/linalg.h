@@ -358,11 +358,13 @@ void linalg_transpose_sf(float* p_a,
  *
  * @param p_a Pointer to vector a of shape [N]
  * @param N Columns of matrix A and B
+ * @param stride Line width of the output matrix Y
  * @param store 0: store everything, 1: store upper right half only, 2: store lower left half only
  * @param p_y Pointer to matrix Y = aa^T of shape [N, N], assuming a is a column vector
  */
 void linalg_vcovmat_f(const float* p_a,
                       unsigned int N,
+                      unsigned int stride,
                       unsigned int store,
                       float* p_y);
 
@@ -427,7 +429,7 @@ void linalg_print_mat_f(const float* p_a,
  *
  * The first k rows of A are ignored, their value is assumed to be 0.
  *
- * @warning This operation is done inplace
+ * @warning This operation is done inplace. Also, only the upper right nonzero part is updated!
  *
  * @param p_a Pointer to matrix A of shape [N, N], where all rows up to k are ignored
  * @param N Dimensionality of the matrix A

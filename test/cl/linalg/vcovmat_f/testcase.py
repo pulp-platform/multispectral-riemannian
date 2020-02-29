@@ -13,13 +13,14 @@ TESTNAME = "cl::linalg::vcovmat_f"
 RESULT_FILE = "result.out"
 
 
-def gen_stimuli(N):
+def gen_stimuli(N, stride):
     """
     This function generates the stimuli (taken from actual data)
     """
-    a = np.random.randn(N, 1).astype(np.float32)
+    a = np.random.randn(stride, 1).astype(np.float32)
+    a[:N, 0] = np.float32(0)
     Y = a @ a.T
-    assert Y.shape == (N, N)
+    assert Y.shape == (stride, stride)
     return a, Y
 
 
@@ -36,7 +37,7 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for N in [22]:
+    for N, stride in [(22, 22), (12, 22), (9, 22)]:
 
         # generate makefile
         mkf = Makefile()
@@ -46,7 +47,7 @@ def test():
         mkf.write()
 
         # generate the stimuli
-        a, Y = gen_stimuli(N)
+        a, Y = gen_stimuli(N, stride)
 
         # prepare header file
         header = HeaderFile("test_stimuli.h")
@@ -54,6 +55,8 @@ def test():
         header.add(HeaderArray("a_stm", "uint32_t", a.ravel(), formatter=float_formatter))
         header.add(HeaderArray("y_exp", "uint32_t", Y.ravel(), formatter=float_formatter))
         header.add(HeaderConstant("DIM", N))
+        header.add(HeaderConstant("STRIDE", stride))
+        header.add(HeaderConstant("K_REM", stride - N))
         header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
         header.write()
 
@@ -63,7 +66,7 @@ def test():
         # parse output
         result = parse_output(RESULT_FILE)
 
-        casename = "N={}".format(N)
+        casename = "N={}, stride={}".format(N, stride)
 
         # log the result
         logger.show_subcase_result(casename, result)

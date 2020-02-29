@@ -21,25 +21,25 @@ float rel_diff(float exp, float acq) {
 int do_bench_0(rt_perf_t* perf, int events) {
     //setup performance measurement
     rt_perf_conf(perf, events);
-    
+
     // start performance measurement
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_vcovmat_f(a_stm_l1, DIM, 0, y_acq_l1);
+    linalg_vcovmat_f(a_stm_l1 + K_REM, DIM, STRIDE, 0, y_acq_l1 + (K_REM * STRIDE + K_REM));
 
     rt_perf_stop(perf);
 
     float max_rel_diff = 0;
 
     int error = 0;
-    for (int _i = 0; _i < DIM; _i++) {
-        for (int _j = 0; _j < DIM; _j++) {
-            int _idx = _i * DIM + _j;
+    for (int _i = K_REM; _i < STRIDE; _i++) {
+        for (int _j = K_REM; _j < STRIDE; _j++) {
+            int _idx = _i * STRIDE + _j;
             float _rel_diff = rel_diff(y_exp_l1[_idx], y_acq_l1[_idx]);
             max_rel_diff = insn_fmax(max_rel_diff, _rel_diff);
             if (_rel_diff > EPSILON) {
-                // printf("error at M=%d, O=%d: diff=%.2e\n", _m, _o, _rel_diff);
+                printf("error at i=%d, j=%d: diff=%.2e\n", _i, _j, _rel_diff);
                 error = 1;
             }
         }
@@ -60,17 +60,17 @@ int do_bench_1(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_vcovmat_f(a_stm_l1, DIM, 1, y_acq_l1);
+    linalg_vcovmat_f(a_stm_l1 + K_REM, DIM, STRIDE, 1, y_acq_l1 + (K_REM * STRIDE + K_REM));
 
     rt_perf_stop(perf);
 
     float max_rel_diff = 0;
 
     int error = 0;
-    for (int _i = 0; _i < DIM; _i++) {
-        for (int _j = 0; _j < DIM; _j++) {
+    for (int _i = K_REM; _i < STRIDE; _i++) {
+        for (int _j = K_REM; _j < STRIDE; _j++) {
             if (_j >= _i) {
-                int _idx = _i * DIM + _j;
+                int _idx = _i * STRIDE + _j;
                 float _rel_diff = rel_diff(y_exp_l1[_idx], y_acq_l1[_idx]);
                 max_rel_diff = insn_fmax(max_rel_diff, _rel_diff);
                 if (_rel_diff > EPSILON) {
@@ -96,17 +96,17 @@ int do_bench_2(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_vcovmat_f(a_stm_l1, DIM, 2, y_acq_l1);
+    linalg_vcovmat_f(a_stm_l1 + K_REM, DIM, STRIDE, 2, y_acq_l1 + (K_REM * STRIDE + K_REM));
 
     rt_perf_stop(perf);
 
     float max_rel_diff = 0;
 
     int error = 0;
-    for (int _i = 0; _i < DIM; _i++) {
-        for (int _j = 0; _j < DIM; _j++) {
+    for (int _i = K_REM; _i < STRIDE; _i++) {
+        for (int _j = K_REM; _j < STRIDE; _j++) {
             if (_i >= _j) {
-                int _idx = _i * DIM + _j;
+                int _idx = _i * STRIDE + _j;
                 float _rel_diff = rel_diff(y_exp_l1[_idx], y_acq_l1[_idx]);
                 max_rel_diff = insn_fmax(max_rel_diff, _rel_diff);
                 if (_rel_diff > EPSILON) {
@@ -131,9 +131,9 @@ void cluster_entry(void* arg) {
     rt_perf_init(&perf);
 
     // allocate memory
-    a_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * DIM);
-    y_acq_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * DIM * DIM);
-    y_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * DIM * DIM);
+    a_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * STRIDE);
+    y_acq_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * STRIDE * STRIDE);
+    y_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * STRIDE * STRIDE);
 
     // copy memory
     rt_dma_copy_t copy;
@@ -143,9 +143,7 @@ void cluster_entry(void* arg) {
 
     int result;
 
-    for (int i = 0; i < 10; i++) {
-        result = do_bench_0(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
-    }
+    result = do_bench_0(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
 
     // print the results
     if (result == 0) {
@@ -159,9 +157,7 @@ void cluster_entry(void* arg) {
     // reset
     linalg_fill_I(y_acq_l1, DIM);
 
-    for (int i = 0; i < 10; i++) {
-        result = do_bench_1(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
-    }
+    result = do_bench_1(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
 
     // print the results
     if (result == 0) {
@@ -175,9 +171,7 @@ void cluster_entry(void* arg) {
     // reset
     linalg_fill_I(y_acq_l1, DIM);
 
-    for (int i = 0; i < 10; i++) {
-        result = do_bench_2(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
-    }
+    result = do_bench_2(&perf, (1<<RT_PERF_CYCLES | 1<<RT_PERF_INSTR));
 
     // print the results
     if (result == 0) {
