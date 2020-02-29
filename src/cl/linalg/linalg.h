@@ -292,6 +292,42 @@ void linalg_matmul_diag_f(float* p_a,
                           unsigned int N);
 
 /**
+ * @brief Compute the matrix vector multiplication. b is assumed to be a column vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to vector b of shape [N]
+ * @param M Rows of matrix A and length of vector y
+ * @param N columns of matrix A and length of vector b
+ * @param stride_a number of elements between the beginning of each row of matrix A, stride_a >= N
+ * @param p_y Pointer to vector y = Ab of shape [M]
+ */
+void linalg_matvecmul_f(const float* p_a,
+                        const float* p_b,
+                        unsigned int M,
+                        unsigned int N,
+                        unsigned int stride_a,
+                        float* p_y);
+
+/**
+ * @brief Compute the vector matrix multiplication. Vector a is assumed to be a row vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to vector a of shape [M]
+ * @param p_b Pointer to matrix B of shape [M, N]
+ * @param M length of vector a and columns of matrix B
+ * @param N rows of matrix B and length of vector y
+ * @param p_y Pointer to vector y = Ab of shape [N]
+ */
+void linalg_vecmatmul_f(const float* p_a,
+                        const float* p_b,
+                        unsigned int M,
+                        unsigned int N,
+                        float* p_y);
+
+/**
  * @brief Applies the givens rotation on matrix A
  *
  * @warning this funciton operates inplace

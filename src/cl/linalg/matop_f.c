@@ -447,6 +447,168 @@ void linalg_matmul_diag_f(float* p_a,
 }
 
 /**
+ * @brief Compute the matrix vector multiplication. b is assumed to be a column vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to vector b of shape [N]
+ * @param M Rows of matrix A and length of vector y
+ * @param N columns of matrix A and length of vector b
+ * @param stride_a number of elements between the beginning of each row of matrix A, stride_a >= N
+ * @param p_y Pointer to vector y = Ab of shape [M]
+ */
+void linalg_matvecmul_f(const float* p_a,
+                        const float* p_b,
+                        unsigned int M,
+                        unsigned int N,
+                        unsigned int stride_a,
+                        float* p_y) {
+
+    const float* _p_a_iter;
+    const float* _p_b_iter;
+    float* _p_y_iter = p_y;
+
+    float _acc0, _acc1, _acc2, _acc3;
+    float _val_a0, _val_a1, _val_a2, _val_a3;
+    float _val_b;
+
+    unsigned int _num_blk = M / 4;
+    unsigned int _rem_blk = M % 4;
+
+    for (int _m = 0; _m < _num_blk; _m++) {
+
+        _acc0 = 0.f;
+        _acc1 = 0.f;
+        _acc2 = 0.f;
+        _acc3 = 0.f;
+        _p_a_iter = p_a + 4 * _m * stride_a;
+        _p_b_iter = p_b;
+
+        for (int _n = 0; _n < N; _n++) {
+            _val_b = *_p_b_iter++;
+            _val_a0 = *(_p_a_iter + 0 * stride_a);
+            _val_a1 = *(_p_a_iter + 1 * stride_a);
+            _val_a2 = *(_p_a_iter + 2 * stride_a);
+            _val_a3 = *(_p_a_iter + 3 * stride_a);
+
+            _p_a_iter++;
+
+            _acc0 = insn_fmadd(_val_b, _val_a0, _acc0);
+            _acc1 = insn_fmadd(_val_b, _val_a1, _acc1);
+            _acc2 = insn_fmadd(_val_b, _val_a2, _acc2);
+            _acc3 = insn_fmadd(_val_b, _val_a3, _acc3);
+        }
+
+        *_p_y_iter++ = _acc0;
+        *_p_y_iter++ = _acc1;
+        *_p_y_iter++ = _acc2;
+        *_p_y_iter++ = _acc3;
+
+    }
+
+    for (int _m = 0; _m < _rem_blk; _m++) {
+
+        _acc0 = 0.f;
+        _p_a_iter = p_a + (4 * _num_blk + _m) * stride_a;
+        _p_b_iter = p_b;
+
+        for (int _n = 0; _n < N; _n++) {
+            _val_b = *_p_b_iter++;
+            _val_a0 = *(_p_a_iter);
+
+            _p_a_iter++;
+
+            _acc0 = insn_fmadd(_val_b, _val_a0, _acc0);
+        }
+
+        *_p_y_iter++ = _acc0;
+
+    }
+
+}
+
+/**
+ * @brief Compute the vector matrix multiplication. Vector a is assumed to be a row vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param p_a Pointer to vector a of shape [M]
+ * @param p_b Pointer to matrix B of shape [M, N]
+ * @param M length of vector a and columns of matrix B
+ * @param N rows of matrix B and length of vector y
+ * @param p_y Pointer to vector y = Ab of shape [N]
+ */
+void linalg_vecmatmul_f(const float* p_a,
+                        const float* p_b,
+                        unsigned int M,
+                        unsigned int N,
+                        float* p_y) {
+
+    const float* _p_a_iter;
+    const float* _p_b_iter;
+    float* _p_y_iter = p_y;
+
+    float _acc0, _acc1, _acc2, _acc3;
+    float _val_b0, _val_b1, _val_b2, _val_b3;
+    float _val_a;
+
+    unsigned int _num_blk = N / 4;
+    unsigned int _rem_blk = N % 4;
+
+    for (int _n = 0; _n < _num_blk; _n++) {
+
+        _acc0 = 0.f;
+        _acc1 = 0.f;
+        _acc2 = 0.f;
+        _acc3 = 0.f;
+        _p_a_iter = p_a;
+        _p_b_iter = p_b + 4 * _n;
+
+        for (int _m = 0; _m < M; _m++) {
+            _val_a = *_p_a_iter++;
+            _val_b0 = *(_p_b_iter + 0);
+            _val_b1 = *(_p_b_iter + 1);
+            _val_b2 = *(_p_b_iter + 2);
+            _val_b3 = *(_p_b_iter + 3);
+
+            _p_b_iter += N;
+
+            _acc0 = insn_fmadd(_val_a, _val_b0, _acc0);
+            _acc1 = insn_fmadd(_val_a, _val_b1, _acc1);
+            _acc2 = insn_fmadd(_val_a, _val_b2, _acc2);
+            _acc3 = insn_fmadd(_val_a, _val_b3, _acc3);
+        }
+
+        *_p_y_iter++ = _acc0;
+        *_p_y_iter++ = _acc1;
+        *_p_y_iter++ = _acc2;
+        *_p_y_iter++ = _acc3;
+
+    }
+
+    for (int _n = 0; _n < _rem_blk; _n++) {
+
+        _acc0 = 0.f;
+        _p_a_iter = p_a;
+        _p_b_iter = p_b + 4 * _num_blk + _n;
+
+        for (int _n = 0; _n < N; _n++) {
+            _val_a = *_p_a_iter++;
+            _val_b0 = *(_p_b_iter);
+
+            _p_b_iter += N;
+
+            _acc0 = insn_fmadd(_val_a, _val_b0, _acc0);
+        }
+
+        *_p_y_iter++ = _acc0;
+
+    }
+
+}
+
+/**
  * @brief compute vector covariance matrix.
  *
  * @warning p_y must already be allocated, use L1 memory!
