@@ -303,13 +303,104 @@ void linalg_apply_givens_rotation_f(float* p_a,
  *            orthogonal matrix. At return, will contain the transformation matrix L combined with
  *            the previous matrix: Q_out = H Q_in
  * @param N Dimension of all matrices.
- * @param p_workspace Pointer to workspace, requires (N * (2N + 1)) space.
+ * @param p_workspace Pointer to workspace, requires (N * (2N + 2)) space.
  */
 void linalg_householder_tridiagonal(float* p_a,
                                     float* p_q,
                                     unsigned int N,
                                     float* p_workspace) {
 
+//#define HOUSEHOLDER_FAST
+#ifdef HOUSEHOLDER_FAST
+
+    /*
+     * Fast implementation of the householder reflections
+     */
+
+    float* _p_v = p_workspace;                  // vector of size N
+    float* _p_w = p_workspace + N;              // vector of size N
+    float* _p_d = p_workspace + 2 * N;          // matrix of size N * N
+    float* _p_vv = p_workspace + 2 * N + N * N; // matrix of size N * N
+
+    float* _p_a = p_a;
+    float* _p_q = p_q;
+
+    float* _p_a_iter = _p_a;
+    float* _p_v_iter;
+    float* _p_w_iter;
+    float* _p_h_iter;
+
+    // Start with the iterations
+    for (int _k = 0; _k < N - 2; _k++) {
+
+        // pointer to A[k,k+1]
+        _p_a_iter = _p_a + _k * (N + 1) + 1;
+
+        // compute the scale of the row right of the current diagonal element
+        float _scale = linalg_vnorm_f(_p_a_iter, (N - _k - 1), 1);
+        if (_scale == 0.f) {
+            continue;
+        }
+
+        float _val = *(_p_a_iter++); // _p_a_iter now points to A[k,k+2]
+        float _scaled_val = insn_fabs(_val / _scale);
+        float _z = (1.f + _scaled_val) * 0.5f;
+        float _sqrtz = insn_fsqrt(_z);
+        float _vec_scale = 1.f / (2.f * _scale * _sqrtz);
+
+        // generate vector _p_v
+        // TODO optimize (but it actually does not matter, all time is spent in matmul)
+        _p_v_iter = _p_v;
+        for (int _i = 0; _i < _k + 1; _i++) {
+            *_p_v_iter++ = 0.f;
+        }
+        *_p_v_iter++ = _sqrtz;
+        for (int _i = _k + 2; _i < N; _i++) {
+            // read the element of A and multiply with the sign of _val
+            float _tmp_val = insn_fsgnjx(*_p_a_iter++, _val);
+            // write the vector
+            *_p_v_iter++ = _tmp_val * _vec_scale;
+        }
+
+        unsigned int _submat_size = N - _k - 1;
+
+        // generate vector w
+        linalg_vecmatmul_f(_p_v + _k + 1, _p_a + (_k + 1) * N, _submat_size, N, _p_w);
+
+        // compute constant c
+        float _c = linalg_vec_innerprod_f(_p_v + _k + 1, _p_w + _k + 1, _submat_size);
+        _c = _c * 4.f;
+
+        // generate matrix d (only the valid part, the rest must be ignored!)
+        linalg_vec_outerprod_f(_p_v + _k + 1, _p_w, _submat_size, N, N, _p_d + (_k + 1) * N);
+
+        // produce 1 * (d + d^T) (only the upper right nonzero part)
+        linalg_2aat_f(_p_d, N, _k + 1);
+
+        // produce vv^T (only the upper right nonzero part)
+        linalg_vcovmat_f(_p_v + _k + 1, _submat_size, N, 1, _p_vv + (_k + 1) * (N + 1));
+
+        // update A <- A - 2 (d + d^T) + 4 c v v^T
+        linalg_householder_update_step(_p_a, _p_d, _p_vv, _c, N, _k + 1);
+
+        // generate w = Q v^T
+        linalg_matvecmul_f(_p_q + _k + 1, _p_v + _k + 1, N, _submat_size, N, _p_w);
+
+        // generate _p_vv = v w
+        linalg_vec_outerprod_f(_p_w, _p_v + _k + 1, N, _submat_size, N, _p_vv + _k + 1);
+
+        // update Q <- Q - 2 Q v v^T = Q - 2 w v^T
+        linalg_householder_update_step_Q(_p_q, _p_vv, N, _k + 1);
+
+    }
+
+#else //HOUSEHOLDER_FAST
+
+    /*
+     * Slow implementation of the householder reflections
+     */
+
+    //workspace use for slow implementation
     float* _p_v = p_workspace;
     float* _p_h = p_workspace + N;
     float* _p_tmp = p_workspace + N * (N + 1);
@@ -357,7 +448,7 @@ void linalg_householder_tridiagonal(float* p_a,
 
         // Generate the rotation matrix H
         // TODO optimize (but it actually does not matter, all time is spent in matmul)
-        linalg_vcovmat_f(_p_v, N, 0, _p_h);
+        linalg_vcovmat_f(_p_v, N, N, 0, _p_h);
         _p_h_iter = _p_h;
         for (int _i = 0; _i < N; _i++) {
             for (int _j = 0; _j < N; _j++) {
@@ -369,6 +460,10 @@ void linalg_householder_tridiagonal(float* p_a,
                 _p_h_iter++;
             }
         }
+
+        /*
+         * Slow householder implementation
+         */
 
         // transform the matrices with H
         unsigned int _submat_size = N - _k - 1;
@@ -412,6 +507,95 @@ void linalg_householder_tridiagonal(float* p_a,
     float* _o_tmp = p_workspace + N * (N + 1); // reconstruct the original tmp matrix
     if (_p_q != p_q) {
         func_copy_mat((uint32_t*)_o_tmp, (uint32_t*)p_q, N, N, N, N);
+    }
+
+#endif //HOUSEHOLDER_FAST
+
+}
+
+/**
+ * @brief updates matrix A inside the householder tridiagonalization
+ *
+ *     A = A - 2ddt + c4 * vvt
+ *
+ * @param p_a Pointer to matrix A, of shape [N, N], is updated in place
+ * @param p_2ddt Pointer to matrix 2 * d d^T, only the nonzero opper right part is used
+ * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
+ * @param c4 Constant cactor 4 * c
+ * @param N Dimensionality of A, 2ddt and vvt
+ * @param kp1 Part of the matrices which are zero (k + 1)
+ */
+void linalg_householder_update_step(float* p_a,
+                                    const float* p_2ddt,
+                                    const float* p_vvt,
+                                    float c4,
+                                    unsigned int N,
+                                    unsigned int kp1) {
+
+    float _val_a, _val_d, _val_v, _result;
+
+    /*
+     * We have three regions: 
+     * 1. the upper left part which is not touched,
+     * 2. the upper right part where only 2ddt is subtracted
+     * 3. the lower right part where we subtract 2ddt and add c4 * vvt
+     */
+
+    // Region 2: rows: 0..kp1, cols: kp1..N
+    for (int _i = 0; _i < kp1; _i++) {
+        for (int _j = kp1; _j < N; _j++) {
+            _val_a = p_a[_i * N + _j];
+            _val_d = p_2ddt[_i * N + _j];
+            _result = _val_a - _val_d;
+            p_a[_i * N + _j] = _result;
+            p_a[_j * N + _i] = _result;
+        }
+    }
+
+    // Region 3: rows: kp1..N, cols: kp1..N, T will be diagonal
+    for (int _i = kp1; _i < N; _i++) {
+        for (int _j = _i; _j < N; _j++) {
+            _val_a = p_a[_i * N + _j];
+            _val_d = p_2ddt[_i * N + _j];
+            _val_v = p_vvt[_i * N + _j];
+
+            _result = insn_fmadd(c4, _val_v, _val_a - _val_d);
+
+            p_a[_i * N + _j] = _result;
+            p_a[_j * N + _i] = _result;
+        }
+    }
+
+}
+
+/**
+ * @brief updates matrix Q inside the householder tridiagonalization
+ *
+ *     Q = Q - 2 * vvt
+ *
+ * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
+ * @param p_vvt Pointer to matrix v v^T, only the nonzero right part is used
+ * @param N Dimensionality of A, 2ddt and vvt
+ * @param kp1 Part of the matrices which are zero (k + 1)
+ */
+void linalg_householder_update_step_Q(float* p_q,
+                                      const float* p_vvt,
+                                      unsigned int N,
+                                      unsigned int kp1) {
+
+    float _val_q, _val_vvt;
+
+    /*
+     * We have two regions, one is never used, and the other must be updated
+     */
+
+    for (int _i = 0; _i < N; _i++) {
+        for (int _j = kp1; _j < N; _j++) {
+            _val_q = p_q[_i * N + _j];
+            _val_vvt = p_vvt[_i * N + _j];
+
+            p_q[_i * N + _j] = insn_fnmsub(_val_vvt, 2.f, _val_q);
+        }
     }
 
 }

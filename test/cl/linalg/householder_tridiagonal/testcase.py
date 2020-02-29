@@ -48,7 +48,7 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for N in [20, 21, 22]:
+    for N in [14, 16, 18, 20, 22]:
 
         # generate makefile
         mkf = Makefile()

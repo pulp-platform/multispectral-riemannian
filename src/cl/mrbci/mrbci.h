@@ -1,7 +1,7 @@
 /**
  * @file mrbci.h
  * @author Tibor Schneider
- * @date 2020/02/20
+ * @date 2020/02/28
  * @brief This file contains the definitions for all blocks in the mrbci
  */
 
@@ -22,6 +22,17 @@ float mrbci_logm_requant;
  * @brief initializes mrbci
  */
 void mrbci_init();
+
+/**
+ * @brief compute all features from the input
+ *
+ * @warning p_in and p_out is not allowed to be in L1, it must reside in L2 memory.
+ * 
+ * @param p_in Pointer to the input matrix of shape [C, T], aligned to [C, T_ALIGN] in L2.
+ * @param p_out Pointer to the entire result vector (of shape MRBCI_SVM_NUM_FEATURES) in L2.
+ */
+void mrbci_extract_features(const int8_t* p_in,
+                            int8_t* p_out);
 
 /**
  * @brief Apply the FIR filter for a given frequency

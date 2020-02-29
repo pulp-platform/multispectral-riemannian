@@ -42,15 +42,25 @@ int do_bench(rt_perf_t* perf, int events) {
 
     rt_perf_stop(perf);
 
+    linalg_print_mat_f(q_acq_l1, N_DIM, N_DIM, N_DIM);
+    printf("\n\n");
+    linalg_print_mat_f(q_exp_l1, N_DIM, N_DIM, N_DIM);
+
     float max_abs_diff = 0.f;
 
     for (int _i = 0; _i < N_DIM; _i++) {
-        for (int _j = 0; _j < N_DIM; _j++) {
+        for (int _j = _i; _j < N_DIM; _j++) {
             int _idx = _i * N_DIM + _j;
             float t_abs_diff = abs_diff(a_stm_l1[_idx], t_exp_l1[_idx]);
             float q_abs_diff = abs_diff(q_acq_l1[_idx], q_exp_l1[_idx]);
             max_abs_diff = insn_fmax(max_abs_diff, t_abs_diff);
             max_abs_diff = insn_fmax(max_abs_diff, q_abs_diff);
+            if (t_abs_diff > EPSILON) {
+                printf("Error at T: i=%d, j=%d, diff=%.2e\n", _i, _j, t_abs_diff);
+            }
+            if (q_abs_diff > EPSILON) {
+                printf("Error at Q: i=%d, j=%d, diff=%.2e\n", _i, _j, q_abs_diff);
+            }
         }
     }
 
@@ -73,7 +83,7 @@ void cluster_entry(void* arg) {
     q_acq_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
     t_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
     q_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * (2 * N_DIM + 1));
+    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * (2 * N_DIM + 2));
 
     // copy memory
     rt_dma_copy_t copy;

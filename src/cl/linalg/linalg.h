@@ -82,6 +82,40 @@ void linalg_householder_tridiagonal(float* p_a,
                                     float* p_workspace);
 
 /**
+ * @brief updates matrix A inside the householder tridiagonalization
+ *
+ *     A = A - 2ddt + c4 * vvt
+ *
+ * @param p_a Pointer to matrix A, of shape [N, N], is updated in place
+ * @param p_2ddt Pointer to matrix 2 * d d^T, only the nonzero opper right part is used
+ * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
+ * @param c4 Constant cactor 4 * c
+ * @param N Dimensionality of A, 2ddt and vvt
+ * @param kp1 Part of the matrices which are zero (k + 1)
+ */
+void linalg_householder_update_step(float* p_a,
+                                    const float* p_2ddt,
+                                    const float* p_vvt,
+                                    float c4,
+                                    unsigned int N,
+                                    unsigned int kp1);
+
+/**
+ * @brief updates matrix Q inside the householder tridiagonalization
+ *
+ *     Q = Q - 2 * vvt
+ *
+ * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
+ * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
+ * @param N Dimensionality of A, 2ddt and vvt
+ * @param kp1 Part of the matrices which are zero (k + 1)
+ */
+void linalg_householder_update_step_Q(float* p_q,
+                                      const float* p_vvt,
+                                      unsigned int N,
+                                      unsigned int kp1);
+
+/**
  * @struct linalg_givens_rotation_t
  * @brief structure containing the sine and cosine for a givens rotation
  *
@@ -369,18 +403,31 @@ void linalg_vcovmat_f(const float* p_a,
                       float* p_y);
 
 /**
+ * @brief computes the inner product of two vectors
+ *
+ * @param p_a Pointer to vector a of shape N, is treated as a row vector
+ * @param p_b Pointer to vector b of shape N, is treated as a column vector
+ * @param N length of vector a and b
+ */
+float linalg_vec_innerprod_f(const float* p_a,
+                             const float* p_b,
+                             unsigned int N);
+
+/**
  * @brief computes the outer product of two vectors
  *
  * @param p_a Pointer to vector a of shape N, is treated as a column vector
  * @param p_b Pointer to vector b of shape M, is treated as a row vector
  * @param N length of vector a and number of rows for matrix Y
  * @param M length of vector b and number of columns of matrix Y
+ * @param stride Distance for each line when writing out the matrix Y
  * @param p_y pointer to matrix Y of shape (N, M)
  */
 void linalg_vec_outerprod_f(const float* p_a,
                             const float* p_b,
                             unsigned int N,
                             unsigned int M,
+                            unsigned int stride,
                             float* p_y);
 
 /**
