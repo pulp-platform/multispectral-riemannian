@@ -726,6 +726,27 @@ void linalg_vcovmat_f(const float* p_a,
 }
 
 /**
+ * @brief computes the inner product of two vectors
+ *
+ * @param p_a Pointer to vector a of shape N, is treated as a row vector
+ * @param p_b Pointer to vector b of shape N, is treated as a column vector
+ * @param N length of vector a and b
+ */
+float linalg_vec_innerprod_f(const float* p_a,
+                             const float* p_b,
+                             unsigned int N) {
+
+    float _acc = 0;
+
+    for (int _i = 0; _i < N; _i++) {
+        _acc = insn_fmadd(*p_a++, *p_b++, _acc);
+    }
+
+    return _acc;
+
+}
+
+/**
  * @brief computes the outer product of two vectors
  *
  * @param p_a Pointer to vector a of shape N, is treated as a column vector
@@ -734,7 +755,7 @@ void linalg_vcovmat_f(const float* p_a,
  * @param M length of vector b and number of columns of matrix Y
  * @param stride Distance for each line when writing out the matrix Y
  * @param p_y pointer to matrix Y of shape (N, M)
- */
+  */
 void linalg_vec_outerprod_f(const float* p_a,
                             const float* p_b,
                             unsigned int N,
@@ -898,7 +919,7 @@ void linalg_2aat_f(float* p_a,
 
     for (int _i = 0; _i < k; _i++) {
         for (int _j = k; _j < N; _j++) {
-            _val0 = p_a[_i * N + _j];
+            _val0 = p_a[_j * N + _i];
             _val0 = 2.f * _val0;
             p_a[_i * N + _j] = _val0;
         }
