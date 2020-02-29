@@ -367,6 +367,21 @@ void linalg_vcovmat_f(const float* p_a,
                       float* p_y);
 
 /**
+ * @brief computes the outer product of two vectors
+ *
+ * @param p_a Pointer to vector a of shape N, is treated as a column vector
+ * @param p_b Pointer to vector b of shape M, is treated as a row vector
+ * @param N length of vector a and number of rows for matrix Y
+ * @param M length of vector b and number of columns of matrix Y
+ * @param p_y pointer to matrix Y of shape (N, M)
+ */
+void linalg_vec_outerprod_f(const float* p_a,
+                            const float* p_b,
+                            unsigned int N,
+                            unsigned int M,
+                            float* p_y);
+
+/**
  * @brief computes the L2 norm of a given vector a
  *
  * @param p_a pointer to vector a
