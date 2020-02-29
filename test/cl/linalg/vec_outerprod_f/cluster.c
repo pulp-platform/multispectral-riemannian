@@ -27,7 +27,7 @@ int do_bench(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_vec_outerprod_f(a_stm_l1, b_stm_l1, N_DIM, M_DIM, y_acq_l1);
+    linalg_vec_outerprod_f(a_stm_l1, b_stm_l1, N_DIM, M_DIM, M_DIM, y_acq_l1);
 
     rt_perf_stop(perf);
 
