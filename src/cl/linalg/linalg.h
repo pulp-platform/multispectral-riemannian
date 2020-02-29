@@ -418,4 +418,23 @@ void linalg_print_mat_f(const float* p_a,
                         unsigned int M,
                         unsigned int stride);
 
+/**
+ * @brief computes 2 (A + A^T) of the square matrix A with zeros in all rows up to but excluding k
+ *
+ *    | 0 0 0 0 0 | 
+ * A: | x x x x x | k is the index of the first row containing values.
+ *    | x x x x x |
+ *
+ * The first k rows of A are ignored, their value is assumed to be 0.
+ *
+ * @warning This operation is done inplace
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], where all rows up to k are ignored
+ * @param N Dimensionality of the matrix A
+ * @param k Number of rows of A assumed to be 0
+ */
+void linalg_2aat_f(float* p_a,
+                   unsigned int N,
+                   unsigned int k);
+
 #endif //__CL_LINALG_H__

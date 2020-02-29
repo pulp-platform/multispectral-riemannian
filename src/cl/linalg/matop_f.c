@@ -860,3 +860,67 @@ void linalg_print_mat_f(const float* p_a,
     printf("]\n");
 
 }
+
+/**
+ * @brief computes 2 (A + A^T) of the square matrix A with zeros in all rows up to but excluding k
+ *
+ *    | 0 0 0 0 0 | 
+ * A: | x x x x x | k is the index of the first row containing values.
+ *    | x x x x x |
+ *
+ * The first k rows of A are ignored, their value is assumed to be 0.
+ *
+ * @warning This operation is done inplace. Also, only the upper right nonzero part is updated!
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], where all rows up to k are ignored
+ * @param N Dimensionality of the matrix A
+ * @param k Number of rows of A assumed to be 0
+ */
+void linalg_2aat_f(float* p_a,
+                   unsigned int N,
+                   unsigned int k) {
+
+    float _val0, _val1;
+
+    // We have 3 different regions, and since the result is symmetric, everything is cloned
+
+    /*
+     * Region 1: upper right part, where we only have to multiply all values by 2
+     */
+
+    for (int _i = 0; _i < k; _i++) {
+        for (int _j = k; _j < N; _j++) {
+            _val0 = p_a[_i * N + _j];
+            _val0 = 2.f * _val0;
+            p_a[_i * N + _j] = _val0;
+        }
+    }
+
+    /*
+     * Region 2 diagonal part
+     */
+    for (int _i = k; _i < N; _i++) {
+        _val0 = p_a[_i * (N + 1)];
+        _val0 = 4.f * _val0;
+        p_a[_i * (N + 1)] = _val0;
+    }
+
+    /*
+     * Region 3, lower right part, where we need to load the values, add and store them back
+     */
+
+    for (int _i = k; _i < N; _i++) {
+        for (int _j = _i + 1; _j < N; _j++) {
+            // read the value
+            _val0 = p_a[_i * N + _j];
+            _val1 = p_a[_j * N + _i];
+
+            // compute the new value
+            _val0 = 2.f * (_val0 + _val1);
+
+            // store the value in both places
+            p_a[_i * N + _j] = _val0;
+        }
+    }
+
+}
