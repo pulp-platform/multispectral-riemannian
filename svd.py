@@ -332,18 +332,28 @@ def _householder_tridiagonal(mat):
     T = mat.copy()
     L = np.eye(N).astype(np.float32)
     R = np.eye(N).astype(np.float32)
-    for k in range(N-2):
-        s = _vec_norm(T[k+1:, k])
+    for k in range(N - 2):
+        s = _vec_norm(T[k + 1:, k])
         if s == 0:
             continue
-        val = T[k+1, k]
+        val = T[k + 1, k]
         sign = np.sign(val)
         z = (np.float32(1) + sign * val / s) / np.float32(2)
         sqrtz = np.sqrt(z)
         v = np.zeros(N).astype(np.float32)
-        v[k+1] = sqrtz
-        v[k+2:] = (sign * T[k, k+2:]) / (np.float32(2) * s * sqrtz)
+        v[k + 1] = sqrtz
+        v[k + 2:] = (sign * T[k, k + 2:]) / (np.float32(2) * s * sqrtz)
         v = v.reshape(-1, 1)
+
+        # new computation
+        # a = T @ v
+        # c = v.T @ a
+        # d = a @ v.T
+        # T = T - 2 * (d + d.T) + 4 * c * (v @ v.T)
+        # L = L - 2 * v @ (v.T @ L)
+        # R = R - 2 * (R @ v) @ v.T
+
+        # old computation
         H = np.eye(N).astype(np.float32) - np.float32(2) * v @ v.T
         T = H @ T @ H
         L = H @ L

@@ -1,4 +1,5 @@
 #include "math.h"
+#include "stdio.h"
 
 #define _GIVENS_SAVE_MIN 1.0e-10
 #define _SQRT2 1.41421353816986083984f
@@ -28,6 +29,7 @@ void apply_givens_rotation_f(float* p_a, givens_rotation_t rot, unsigned int k, 
 givens_rotation_t givens_rotation(float a, float b);
 givens_rotation_t givens_rotation_diag(float a, float b, float c);
 evd_2x2_t evd_2x2(float a, float b, float c);
+void print_mat_f(const float* p_a, unsigned int N, unsigned int M, unsigned int stride);
 
 void svd_sym(float* p_a,
              float* p_q,
@@ -605,4 +607,34 @@ evd_2x2_t evd_2x2(float a,
     }
 
     return res;
+}
+
+void print_mat_f(const float* p_a,
+                 unsigned int N,
+                 unsigned int M,
+                 unsigned int stride) {
+
+    const float* _mat_iter = p_a;
+
+    unsigned int line_offset = stride - M;
+
+    printf("[");
+    for (int _i = 0; _i < N; _i++) {
+        if (_i > 0) {
+            printf(",\n ");
+        }
+        printf("[");
+
+        for (int _j = 0; _j < M; _j++) {
+            if (_j > 0) {
+                printf(", ");
+            }
+            printf("%+.2e", *_mat_iter++);
+        }
+
+        printf("]");
+        _mat_iter += line_offset;
+    }
+    printf("]\n");
+
 }
