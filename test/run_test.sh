@@ -6,7 +6,7 @@ export WOLFTEST_USE_FMA=true
 export WOLFTEST_USE_SQRTDIV=true
 export WOLFTEST_EPSILON=1e-35
 
-while getopts "bp:tfde:h" name; do
+while getopts "bp:tfdea:h" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;
@@ -14,13 +14,15 @@ while getopts "bp:tfde:h" name; do
         f) export WOLFTEST_USE_FMA=false;;
         d) export WOLFTEST_USE_SQRTDIV=false;;
         e) export WOLFTEST_EPSILON=$OPTARG;;
+        a) export WOLFTEST_EXHAUSTIVE=true;;
         h) printf "Usage: %s [-b] [-p platform] [-f] [-d] [-e epsilon] [root_folder]\n" $0
            printf " -b            build on the board, equivalent to -p board\n"
            printf " -p <platform> build on the desired platform [board | gvsoc], default is gvsoc\n"
            printf " -h            show this help message\n"
            printf " -f            do not use float fused multiply add instructions\n"
            printf " -d            do not use float divide and square root instructions\n"
-           printf " -a  <epsilon> accuracy for all floating point tests, defaults to 1e-35\n"
+           printf " -e  <epsilon> accuracy for all floating point tests, defaults to 1e-35\n"
+           printf " -a            Do exhaustive testing of all the blocks in MRBCI"
            printf " root_folder   Start folder where to execute all the tests\n"
            exit 0;;
         ?) printf "Usage: %s [-b] [-p platform] root_folder\n" $0

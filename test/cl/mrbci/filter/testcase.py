@@ -49,10 +49,14 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    # choose 4 random frequencies out of 18
-    freqs = list(range(18))
-    random.shuffle(freqs)
-    for freq_idx in freqs[:4]:
+    if "WOLFTEST_EXHAUSTIVE" in os.environ:
+        freqs_iter = list(range(18))
+    else:
+        freqs = list(range(18))
+        random.shuffle(freqs)
+        freqs_iter = freqs[:4]
+
+    for freq_idx in freqs_iter:
 
         # generate makefile
         mkf = Makefile()
