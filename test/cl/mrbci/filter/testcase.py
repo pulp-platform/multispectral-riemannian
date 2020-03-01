@@ -49,48 +49,58 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    if "WOLFTEST_EXHAUSTIVE" in os.environ:
-        freqs_iter = list(range(18))
-    else:
-        freqs = list(range(18))
-        random.shuffle(freqs)
-        freqs_iter = freqs[:4]
+    for parallel in [(False),
+                     (True)]:
 
-    for freq_idx in freqs_iter:
+        if "WOLFTEST_EXHAUSTIVE" in os.environ:
+            freqs_iter = list(range(18))
+        else:
+            freqs = list(range(18))
+            random.shuffle(freqs)
+            freqs_iter = freqs[:4]
 
-        # generate makefile
-        mkf = Makefile()
-        mkf.add_fc_test_source("test.c")
-        mkf.add_cl_test_source("cluster.c")
-        mkf.add_cl_prog_source("mrbci/mrbci_params.c")
-        mkf.add_cl_prog_source("mrbci/mrbci.c")
-        mkf.add_cl_prog_source("mrbci/filter.c")
-        mkf.add_cl_prog_source("func/sos_filt.c")
-        mkf.write()
+        for freq_idx in freqs_iter:
 
-        # generate the stimuli
-        X, Y, block = gen_stimuli(freq_idx)
-        X_align = align_array(X)
-        Y_align = align_array(Y)
+            # generate makefile
+            mkf = Makefile()
+            mkf.add_fc_test_source("test.c")
+            mkf.add_cl_test_source("cluster.c")
+            mkf.add_cl_prog_source("mrbci/mrbci_params.c")
+            mkf.add_cl_prog_source("mrbci/mrbci.c")
+            mkf.add_cl_prog_source("mrbci/filter.c")
+            mkf.add_cl_prog_source("func/sos_filt.c")
 
-        # prepare header file
-        header = HeaderFile("test_stimuli.h")
-        # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-        header.add(HeaderArray("x_stm", "int8_t", X_align.ravel()))
-        header.add(HeaderArray("y_exp", "int8_t", Y_align.ravel()))
-        header.add(HeaderConstant("FREQ_IDX", freq_idx))
-        header.write()
+            if parallel:
+                mkf.add_define("PARALLEL")
 
-        # compile and run
-        os.system("make clean all run > {}".format(RESULT_FILE))
+            mkf.write()
 
-        # parse output
-        result = parse_output(RESULT_FILE)
+            # generate the stimuli
+            X, Y, block = gen_stimuli(freq_idx)
+            X_align = align_array(X)
+            Y_align = align_array(Y)
 
-        casename = "freq_idx: {}".format(freq_idx)
+            # prepare header file
+            header = HeaderFile("test_stimuli.h")
+            # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
+            header.add(HeaderArray("x_stm", "int8_t", X_align.ravel()))
+            header.add(HeaderArray("y_exp", "int8_t", Y_align.ravel()))
+            header.add(HeaderConstant("FREQ_IDX", freq_idx))
+            header.write()
 
-        # log the result
-        logger.show_subcase_result(casename, result)
+            # compile and run
+            os.system("make clean all run > {}".format(RESULT_FILE))
+
+            # parse output
+            result = parse_output(RESULT_FILE)
+
+            casename = "freq {:02d}".format(freq_idx)
+
+            if parallel:
+                casename += " + par"
+
+            # log the result
+            logger.show_subcase_result(casename, result)
 
     # return summary
     return logger.summary()

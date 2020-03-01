@@ -50,50 +50,59 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    if "WOLFTEST_EXHAUSTIVE" in os.environ:
-        freqs_iter = list(range(18))
-    else:
-        freqs = list(range(18))
-        random.shuffle(freqs)
-        freqs_iter = freqs[:4]
+    for fast_householder in [(False), (True)]:
 
-    for freq_idx in freqs_iter:
+        if "WOLFTEST_EXHAUSTIVE" in os.environ:
+            freqs_iter = list(range(18))
+        else:
+            freqs = list(range(18))
+            random.shuffle(freqs)
+            freqs_iter = freqs[:4]
 
-        # generate makefile
-        mkf = Makefile()
-        mkf.add_fc_test_source("test.c")
-        mkf.add_cl_test_source("cluster.c")
-        mkf.add_cl_prog_source("mrbci/mrbci_params.c")
-        mkf.add_cl_prog_source("mrbci/mrbci.c")
-        mkf.add_cl_prog_source("mrbci/logm.c")
-        mkf.add_cl_prog_source("func/convert.c")
-        mkf.add_cl_prog_source("func/copy_mat.c")
-        mkf.add_cl_prog_source("linalg/matop_f.c")
-        mkf.add_cl_prog_source("linalg/svd.c")
-        mkf.write()
+        for freq_idx in freqs_iter:
 
-        # generate the stimuli
-        X, Y, _ = gen_stimuli(freq_idx)
-        Y_align = align_array(Y)
+            # generate makefile
+            mkf = Makefile()
+            mkf.add_fc_test_source("test.c")
+            mkf.add_cl_test_source("cluster.c")
+            mkf.add_cl_prog_source("mrbci/mrbci_params.c")
+            mkf.add_cl_prog_source("mrbci/mrbci.c")
+            mkf.add_cl_prog_source("mrbci/logm.c")
+            mkf.add_cl_prog_source("func/convert.c")
+            mkf.add_cl_prog_source("func/copy_mat.c")
+            mkf.add_cl_prog_source("linalg/matop_f.c")
+            mkf.add_cl_prog_source("linalg/svd.c")
 
-        # prepare header file
-        header = HeaderFile("test_stimuli.h")
-        # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-        header.add(HeaderArray("x_stm", "int32_t", X.ravel()))
-        header.add(HeaderArray("y_exp", "int8_t", Y_align.ravel()))
-        header.add(HeaderConstant("FREQ_IDX", freq_idx))
-        header.write()
+            if not fast_householder:
+                mkf.add_define("HOUSEHOLDER_SLOW")
 
-        # compile and run
-        os.system("make clean all run > {}".format(RESULT_FILE))
+            mkf.write()
 
-        # parse output
-        result = parse_output(RESULT_FILE)
+            # generate the stimuli
+            X, Y, _ = gen_stimuli(freq_idx)
+            Y_align = align_array(Y)
 
-        casename = "freq_idx: {}".format(freq_idx)
+            # prepare header file
+            header = HeaderFile("test_stimuli.h")
+            # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
+            header.add(HeaderArray("x_stm", "int32_t", X.ravel()))
+            header.add(HeaderArray("y_exp", "int8_t", Y_align.ravel()))
+            header.add(HeaderConstant("FREQ_IDX", freq_idx))
+            header.write()
 
-        # log the result
-        logger.show_subcase_result(casename, result)
+            # compile and run
+            os.system("make clean all run > {}".format(RESULT_FILE))
+
+            # parse output
+            result = parse_output(RESULT_FILE)
+
+            casename = "freq {:02d}".format(freq_idx)
+
+            if fast_householder:
+                casename += " + fast hh"
+
+            # log the result
+            logger.show_subcase_result(casename, result)
 
     # return summary
     return logger.summary()
