@@ -303,7 +303,7 @@ void linalg_apply_givens_rotation_f(float* p_a,
  *            orthogonal matrix. At return, will contain the transformation matrix L combined with
  *            the previous matrix: Q_out = H Q_in
  * @param N Dimension of all matrices.
- * @param p_workspace Pointer to workspace, requires (N * (2N + 2)) space.
+ * @param p_workspace Pointer to workspace, requires (N * 2) space.
  */
 void linalg_householder_tridiagonal(float* p_a,
                                     float* p_q,
@@ -319,8 +319,6 @@ void linalg_householder_tridiagonal(float* p_a,
 
     float* _p_v = p_workspace;                  // vector of size N
     float* _p_w = p_workspace + N;              // vector of size N
-    float* _p_d = p_workspace + 2 * N;          // matrix of size N * N
-    float* _p_vv = p_workspace + 2 * N + N * N; // matrix of size N * N
 
     float* _p_a = p_a;
     float* _p_q = p_q;
@@ -629,7 +627,7 @@ void linalg_householder_update_step_Q(float* p_q,
 
         _w_i_n2 = p_w[_i] * -2.f;
 
-        for (unsigned int _j = 0; _j < N; _j++) {
+        for (unsigned int _j = kp1; _j < N; _j++) {
             updated_q = p_q[_i * N + _j];
             _v_j = p_v[_j];
             updated_q = insn_fmadd(_w_i_n2, _v_j, updated_q);
