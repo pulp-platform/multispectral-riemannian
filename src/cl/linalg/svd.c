@@ -639,38 +639,6 @@ void linalg_householder_update_step_Q(float* p_q,
 }
 
 /**
- * @brief updates matrix Q inside the householder tridiagonalization
- *
- *     Q = Q - 2 * vvt
- *
- * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
- * @param p_vvt Pointer to matrix v v^T, only the nonzero right part is used
- * @param N Dimensionality of A, 2ddt and vvt
- * @param kp1 Part of the matrices which are zero (k + 1)
- */
-/*
-void linalg_householder_update_step_Q(float* p_q,
-                                      const float* p_vvt,
-                                      unsigned int N,
-                                      unsigned int kp1) {
-
-    float _val_q, _val_vvt;
-
-    // We have two regions, one is never used, and the other must be updated
-
-    for (int _i = 0; _i < N; _i++) {
-        for (int _j = kp1; _j < N; _j++) {
-            _val_q = p_q[_i * N + _j];
-            _val_vvt = p_vvt[_i * N + _j];
-
-            p_q[_i * N + _j] = insn_fnmsub(_val_vvt, 2.f, _val_q);
-        }
-    }
-
-}
-*/
-
-/**
  * @brief Computes the givens rotation coefficients cosine and sine
  *
  * | c -s | | a | = | r |
