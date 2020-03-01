@@ -6,10 +6,9 @@
 #include "../../../../src/cl/insn.h"
 
 RT_CL_DATA static float* a_stm_l1;
-RT_CL_DATA static float* q_acq_l1;
-RT_CL_DATA static float* t_exp_l1;
-RT_CL_DATA static float* q_exp_l1;
-RT_CL_DATA static float* workspace_l1;
+RT_CL_DATA static float* v_stm_l1;
+RT_CL_DATA static float* w_stm_l1;
+RT_CL_DATA static float* y_exp_l1;
 
 
 float rel_diff(float exp, float acq) {
@@ -34,28 +33,34 @@ int do_bench(rt_perf_t* perf, int events) {
     //setup performance measurement
     rt_perf_conf(perf, events);
 
+    float _c = *((float*)c_stm);
+
+    printf("\n\nA before:\n");
+    linalg_print_mat_f(a_stm_l1, N_DIM, N_DIM, N_DIM);
+
     // start performance measurement
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
-    linalg_householder_tridiagonal(a_stm_l1, q_acq_l1, N_DIM, workspace_l1);
+    linalg_householder_update_step(a_stm_l1, v_stm_l1, w_stm_l1, _c, N_DIM, KP1);
 
     rt_perf_stop(perf);
+
+    printf("\n\nA after:\n");
+    linalg_print_mat_f(a_stm_l1, N_DIM, N_DIM, N_DIM);
+
+    printf("\n\nExpected\n");
+    linalg_print_mat_f(y_exp_l1, N_DIM, N_DIM, N_DIM);
 
     float max_abs_diff = 0.f;
 
     for (int _i = 0; _i < N_DIM; _i++) {
-        for (int _j = _i; _j < N_DIM; _j++) {
+        for (int _j = 0; _j < N_DIM; _j++) {
             int _idx = _i * N_DIM + _j;
-            float t_abs_diff = abs_diff(a_stm_l1[_idx], t_exp_l1[_idx]);
-            float q_abs_diff = abs_diff(q_acq_l1[_idx], q_exp_l1[_idx]);
-            max_abs_diff = insn_fmax(max_abs_diff, t_abs_diff);
-            max_abs_diff = insn_fmax(max_abs_diff, q_abs_diff);
-            if (t_abs_diff > EPSILON) {
-                printf("Error at T: i=%d, j=%d, diff=%.2e\n", _i, _j, t_abs_diff);
-            }
-            if (q_abs_diff > EPSILON) {
-                printf("Error at Q: i=%d, j=%d, diff=%.2e\n", _i, _j, q_abs_diff);
+            float a_abs_diff = abs_diff(a_stm_l1[_idx], y_exp_l1[_idx]);
+            max_abs_diff = insn_fmax(max_abs_diff, a_abs_diff);
+            if (a_abs_diff > EPSILON) {
+                printf("Error at i=%d, j=%d, exp=%.2e, acq=%.2e\n", _i, _j, y_exp_l1[_idx], a_stm_l1[_idx]);
             }
         }
     }
@@ -76,20 +81,17 @@ void cluster_entry(void* arg) {
 
     // allocate memory
     a_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    q_acq_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    t_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    q_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * (2 * N_DIM + 2));
+    v_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM);
+    w_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM);
+    y_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
 
     // copy memory
     rt_dma_copy_t copy;
     rt_dma_memcpy((unsigned int)a_stm, (unsigned int)a_stm_l1, sizeof(a_stm), RT_DMA_DIR_EXT2LOC, 0, &copy);
-    rt_dma_memcpy((unsigned int)t_exp, (unsigned int)t_exp_l1, sizeof(t_exp), RT_DMA_DIR_EXT2LOC, 1, &copy);
-    rt_dma_memcpy((unsigned int)q_exp, (unsigned int)q_exp_l1, sizeof(q_exp), RT_DMA_DIR_EXT2LOC, 1, &copy);
+    rt_dma_memcpy((unsigned int)v_stm, (unsigned int)v_stm_l1, sizeof(v_stm), RT_DMA_DIR_EXT2LOC, 1, &copy);
+    rt_dma_memcpy((unsigned int)w_stm, (unsigned int)w_stm_l1, sizeof(w_stm), RT_DMA_DIR_EXT2LOC, 1, &copy);
+    rt_dma_memcpy((unsigned int)y_exp, (unsigned int)y_exp_l1, sizeof(y_exp), RT_DMA_DIR_EXT2LOC, 1, &copy);
     rt_dma_wait(&copy);
-
-    // prepare l_acq and r_acq
-    linalg_fill_I(q_acq_l1, N_DIM);
 
     int result;
 

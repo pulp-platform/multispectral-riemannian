@@ -327,8 +327,6 @@ void linalg_householder_tridiagonal(float* p_a,
 
     float* _p_a_iter = _p_a;
     float* _p_v_iter;
-    float* _p_w_iter;
-    float* _p_h_iter;
 
     // Start with the iterations
     for (int _k = 0; _k < N - 2; _k++) {
@@ -369,19 +367,9 @@ void linalg_householder_tridiagonal(float* p_a,
 
         // compute constant c
         float _c = linalg_vec_innerprod_f(_p_v + _k + 1, _p_w + _k + 1, _submat_size);
-        _c = _c * 4.f;
 
-        // generate matrix d (only the valid part, the rest must be ignored!)
-        linalg_vec_outerprod_f(_p_v + _k + 1, _p_w, _submat_size, N, N, _p_d + (_k + 1) * N);
-
-        // produce 1 * (d + d^T) (only the upper right nonzero part)
-        linalg_2aat_f(_p_d, N, _k + 1);
-
-        // produce vv^T (only the upper right nonzero part)
-        linalg_vcovmat_f(_p_v + _k + 1, _submat_size, N, 1, _p_vv + (_k + 1) * (N + 1));
-
-        // update A <- A - 2 (d + d^T) + 4 c v v^T
-        linalg_householder_update_step(_p_a, _p_d, _p_vv, _c, N, _k + 1);
+        // update matrix A
+        linalg_householder_update_step(_p_a, _p_v, _p_w, _c, N, _k + 1);
 
         // generate w = Q v^T
         linalg_matvecmul_f(_p_q + _k + 1, _p_v + _k + 1, N, _submat_size, N, _p_w);
@@ -514,58 +502,107 @@ void linalg_householder_tridiagonal(float* p_a,
 }
 
 /**
- * @brief updates matrix A inside the householder tridiagonalization
+ * @brief update matrix A inside the householder tridiagonalization
  *
- *     A = A - 2ddt + c4 * vvt
+ *     A = A - 2 (vw^T + wv^T) + 4 * c * v v^T
  *
- * @param p_a Pointer to matrix A, of shape [N, N], is updated in place
- * @param p_2ddt Pointer to matrix 2 * d d^T, only the nonzero opper right part is used
- * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
- * @param c4 Constant cactor 4 * c
- * @param N Dimensionality of A, 2ddt and vvt
- * @param kp1 Part of the matrices which are zero (k + 1)
+ * @param p_a Pointer to matrix A of shape [N, N], is updated in place
+ * @param p_v Pointer to vector v of shape [N], all values up to k+1 are assumed to be zero
+ * @param p_w Pointer to vector w of shape [N]
+ * @param c constant factor c
+ * @param N dimensionality
+ * @param kp1 Part of the vector v which is zero (kp1 = k + 1)
  */
 void linalg_householder_update_step(float* p_a,
-                                    const float* p_2ddt,
-                                    const float* p_vvt,
-                                    float c4,
+                                    const float* p_v,
+                                    const float* p_w,
+                                    float c,
                                     unsigned int N,
                                     unsigned int kp1) {
 
-    float _val_a, _val_d, _val_v, _result;
+    // We have three regions: 
+    // 1. the upper left part which is not touched,
+    // 2. the upper right part where only 2ddt is subtracted
+    // 3. the lower right part where we subtract 2ddt and add c4 * vvt
 
-    /*
-     * We have three regions: 
-     * 1. the upper left part which is not touched,
-     * 2. the upper right part where only 2ddt is subtracted
-     * 3. the lower right part where we subtract 2ddt and add c4 * vvt
-     */
+    float _v_i_2, _w_i_2; // values of v and w at position i, multiplied by 2
+    float _v_j, _w_j;     // values of v and w at position j
+    float _updated_a; // new value for a at position (i, j) and (j, i)
 
-    // Region 2: rows: 0..kp1, cols: kp1..N
+    // Region 2
+
     for (int _i = 0; _i < kp1; _i++) {
+
+        //_v_i_2 = 0.f // v_i is always 0 at these positions
+        _w_i_2 = p_w[_i] * 2.f;
+
         for (int _j = kp1; _j < N; _j++) {
-            _val_a = p_a[_i * N + _j];
-            _val_d = p_2ddt[_i * N + _j];
-            _result = _val_a - _val_d;
-            p_a[_i * N + _j] = _result;
-            p_a[_j * N + _i] = _result;
+
+            _v_j = p_v[_j];
+            _updated_a = p_a[_i * N + _j];
+
+            // behavior with fmadd
+            _updated_a = insn_fnmsub(_v_j, _w_i_2, _updated_a);
+
+            // write back the value
+            p_a[_i * N + _j] = _updated_a;
+            p_a[_j * N + _i] = _updated_a;
         }
     }
 
-    // Region 3: rows: kp1..N, cols: kp1..N, T will be diagonal
-    for (int _i = kp1; _i < N; _i++) {
-        for (int _j = _i; _j < N; _j++) {
-            _val_a = p_a[_i * N + _j];
-            _val_d = p_2ddt[_i * N + _j];
-            _val_v = p_vvt[_i * N + _j];
+    // Region 3 (diagonal part): 2ddt = 4 * v[ij] * w[ij]
+    float _v_v_i_4; // v_i * v_i * 4
+    for (int _ij = kp1; _ij < N; _ij++) {
 
-            _result = insn_fmadd(c4, _val_v, _val_a - _val_d);
+        _w_i_2 = p_w[_ij] * 2.f;
+        _v_i_2 = p_v[_ij] * 2.f;
 
-            p_a[_i * N + _j] = _result;
-            p_a[_j * N + _i] = _result;
-        }
+        _updated_a = p_a[_ij * N + _ij];
+
+        // update a with the 2ddt part
+        _updated_a = insn_fnmsub(_w_i_2, _v_i_2, _updated_a);
+
+        // update with the 4c vvt part
+        _v_v_i_4 = _v_i_2 * _v_i_2;
+        _updated_a = insn_fmadd(c, _v_v_i_4, _updated_a);
+
+        // write back value
+        p_a[_ij * N + _ij] = _updated_a;
     }
 
+    // Since one of the v in 4cvvt is already multiplied by 2, we want c to multiply by 2
+    float _c_2 = c * 2.f;
+    float _c_v_i_4;
+    float _2ddt;
+
+    // Region 3 (Nondiagonal part)
+
+    for (int _i = kp1; _i < N - 1; _i++) {
+
+        _v_i_2 = p_v[_i] * 2.f;
+        _w_i_2 = p_w[_i] * 2.f;
+        _c_v_i_4 = _v_i_2 * _c_2;
+
+        for (int _j = _i + 1; _j < N; _j++) {
+            _v_j = p_v[_j];
+            _w_j = p_w[_j];
+
+            _updated_a = p_a[_i * N + _j];
+
+            // update with the 4cvvt part
+            _updated_a = insn_fmadd(_c_v_i_4, _v_j, _updated_a);
+
+            // update with the 2ddt part
+            _2ddt = _v_i_2 * _w_j;
+            _2ddt = insn_fmadd(_v_j, _w_i_2, _2ddt);
+
+            _updated_a -= _2ddt;
+
+            // write back the value
+            p_a[_i * N + _j] = _updated_a;
+            p_a[_j * N + _i] = _updated_a;
+        }
+    }
 }
 
 /**

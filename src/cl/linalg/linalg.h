@@ -82,23 +82,24 @@ void linalg_householder_tridiagonal(float* p_a,
                                     float* p_workspace);
 
 /**
- * @brief updates matrix A inside the householder tridiagonalization
+ * @brief update matrix A inside the householder tridiagonalization
  *
- *     A = A - 2ddt + c4 * vvt
+ *     A = A - 2 (vw^T + wv^T) + 4 * c * v v^T
  *
- * @param p_a Pointer to matrix A, of shape [N, N], is updated in place
- * @param p_2ddt Pointer to matrix 2 * d d^T, only the nonzero opper right part is used
- * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
- * @param c4 Constant cactor 4 * c
- * @param N Dimensionality of A, 2ddt and vvt
- * @param kp1 Part of the matrices which are zero (k + 1)
+ * @param p_a Pointer to matrix A of shape [N, N], is updated in place
+ * @param p_v Pointer to vector v of shape [N], all values up to k+1 are assumed to be zero
+ * @param p_w Pointer to vector w of shape [N]
+ * @param c constant factor c
+ * @param N dimensionality
+ * @param kp1 Part of the vector v which is zero (kp1 = k + 1)
  */
 void linalg_householder_update_step(float* p_a,
-                                    const float* p_2ddt,
-                                    const float* p_vvt,
-                                    float c4,
+                                    const float* p_v,
+                                    const float* p_w,
+                                    float c,
                                     unsigned int N,
                                     unsigned int kp1);
+
 
 /**
  * @brief updates matrix Q inside the householder tridiagonalization
