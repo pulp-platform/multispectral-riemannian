@@ -37,7 +37,7 @@ void cluster_entry(void* arg) {
     // allocate memory
     x_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(int32_t) * MRBCI_C * MRBCI_C);
     y_acq_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(int8_t) * MRBCI_C * MRBCI_C_ALIGN);
-    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * MRBCI_C * (MRBCI_C * 3 + 1));
+    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * MRBCI_C * (MRBCI_C * 3 + 2));
 
     // copy memory
     rt_dma_copy_t copy;

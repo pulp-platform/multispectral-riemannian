@@ -593,7 +593,7 @@ void linalg_vecmatmul_f(const float* p_a,
         _p_a_iter = p_a;
         _p_b_iter = p_b + 4 * _num_blk + _n;
 
-        for (int _n = 0; _n < N; _n++) {
+        for (int _m = 0; _m < M; _m++) {
             _val_a = *_p_a_iter++;
             _val_b0 = *(_p_b_iter);
 

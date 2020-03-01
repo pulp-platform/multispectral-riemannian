@@ -49,7 +49,9 @@ def test():
 
     for M, N in [(22, 22),
                  (21, 21),
-                 (12, 12)]:
+                 (12, 12),
+                 (20, 16),
+                 (19, 15)]:
 
         # generate makefile
         mkf = Makefile()

@@ -67,7 +67,7 @@ void cluster_entry(void* arg) {
     // allocate memory
     a_stm_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
     y_exp_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * N_DIM);
-    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * (N_DIM * 3 + 1));
+    workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * N_DIM * (N_DIM * 3 + 2));
 
     // copy memory
     rt_dma_copy_t copy;
