@@ -310,8 +310,7 @@ void linalg_householder_tridiagonal(float* p_a,
                                     unsigned int N,
                                     float* p_workspace) {
 
-#define HOUSEHOLDER_FAST
-#ifdef HOUSEHOLDER_FAST
+#ifndef HOUSEHOLDER_SLOW
 
     /*
      * Fast implementation of the householder reflections
@@ -377,7 +376,7 @@ void linalg_householder_tridiagonal(float* p_a,
 
     }
 
-#else //HOUSEHOLDER_FAST
+#else //HOUSEHOLDER_SLOW set
 
     /*
      * Slow implementation of the householder reflections
@@ -492,7 +491,7 @@ void linalg_householder_tridiagonal(float* p_a,
         func_copy_mat((uint32_t*)_o_tmp, (uint32_t*)p_q, N, N, N, N);
     }
 
-#endif //HOUSEHOLDER_FAST
+#endif //HOUSEHOLDER_SLOW
 
 }
 

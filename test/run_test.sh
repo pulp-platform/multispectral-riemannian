@@ -6,7 +6,7 @@ export WOLFTEST_USE_FMA=true
 export WOLFTEST_USE_SQRTDIV=true
 export WOLFTEST_EPSILON=1e-35
 
-while getopts "bp:tfdea:h" name; do
+while getopts "bp:tfde:ah" name; do
     case "$name" in
         b) PLATFORM="board";;
         p) PLATFORM=$OPTARG;;

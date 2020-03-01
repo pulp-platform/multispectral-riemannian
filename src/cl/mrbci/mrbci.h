@@ -24,6 +24,17 @@ float mrbci_logm_requant;
 void mrbci_init();
 
 /**
+ * @brief Do the entire multiscale reiamnnian BCI
+ *
+ * @brief p_in and p_out are not allowed to be in L1, they must reside in L2 memory.
+ *
+ * @param p_in Pointer to the input matrix of shape [C, T], aligned to [C, T_ALIGN] in L2.
+ * @param p_out Pointer to result of shape [MRBCI_NUM_CLASS] in L2
+ */
+void mrbci_run(const int8_t* p_in,
+               int32_t* p_out);
+
+/**
  * @brief compute all features from the input
  *
  * @warning p_in and p_out is not allowed to be in L1, it must reside in L2 memory.
@@ -33,6 +44,17 @@ void mrbci_init();
  */
 void mrbci_extract_features(const int8_t* p_in,
                             int8_t* p_out);
+
+/**
+ * @brief compute SVM (matrix multiplication followed by vector addition)
+ *
+ * @warning p_in and p_out must reside on L2 memory, not on L1.
+ *
+ * @param p_in Pointer to feature map of shape [MRBCI_SVM_NUM_FEATURES] in L2 (aligned)
+ * @param p_out Pointer to result of shape [MRBCI_NUM_CLASS] in L2
+ */
+void mrbci_svm(const int8_t* p_in,
+               int32_t* p_out);
 
 /**
  * @brief Apply the FIR filter for a given frequency
