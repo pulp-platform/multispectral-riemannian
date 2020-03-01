@@ -374,11 +374,8 @@ void linalg_householder_tridiagonal(float* p_a,
         // generate w = Q v^T
         linalg_matvecmul_f(_p_q + _k + 1, _p_v + _k + 1, N, _submat_size, N, _p_w);
 
-        // generate _p_vv = v w
-        linalg_vec_outerprod_f(_p_w, _p_v + _k + 1, N, _submat_size, N, _p_vv + _k + 1);
-
         // update Q <- Q - 2 Q v v^T = Q - 2 w v^T
-        linalg_householder_update_step_Q(_p_q, _p_vv, N, _k + 1);
+        linalg_householder_update_step_Q(_p_q, _p_v, _p_w, N, _k + 1);
 
     }
 
@@ -608,6 +605,42 @@ void linalg_householder_update_step(float* p_a,
 /**
  * @brief updates matrix Q inside the householder tridiagonalization
  *
+ *     Q = Q - 2 * w v^T  (both v and w are assumed to be column vectors)
+ *
+ * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
+ * @param p_v Pointer to vector v of shape [N], all values up to k+1 are assumed to be zero
+ * @param p_w Pointer to vector w of shape [N]
+ * @param N Dimensionality of Q and both vectors v and w
+ * @param kp1 Part of the matrices which are zero (k + 1)
+ */
+void linalg_householder_update_step_Q(float* p_q,
+                                      const float* p_v,
+                                      const float* p_w,
+                                      unsigned int N,
+                                      unsigned int kp1) {
+
+    // we have two regions, one is never used, and the other must be updated
+
+    float _w_i_n2; // value of -2*w[i]
+    float _v_j;
+    float updated_q;
+
+    for (unsigned int _i = 0; _i < N; _i++) {
+
+        _w_i_n2 = p_w[_i] * -2.f;
+
+        for (unsigned int _j = 0; _j < N; _j++) {
+            updated_q = p_q[_i * N + _j];
+            _v_j = p_v[_j];
+            updated_q = insn_fmadd(_w_i_n2, _v_j, updated_q);
+            p_q[_i * N + _j] = updated_q;
+        }
+    }
+}
+
+/**
+ * @brief updates matrix Q inside the householder tridiagonalization
+ *
  *     Q = Q - 2 * vvt
  *
  * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
@@ -615,6 +648,7 @@ void linalg_householder_update_step(float* p_a,
  * @param N Dimensionality of A, 2ddt and vvt
  * @param kp1 Part of the matrices which are zero (k + 1)
  */
+/*
 void linalg_householder_update_step_Q(float* p_q,
                                       const float* p_vvt,
                                       unsigned int N,
@@ -622,9 +656,7 @@ void linalg_householder_update_step_Q(float* p_q,
 
     float _val_q, _val_vvt;
 
-    /*
-     * We have two regions, one is never used, and the other must be updated
-     */
+    // We have two regions, one is never used, and the other must be updated
 
     for (int _i = 0; _i < N; _i++) {
         for (int _j = kp1; _j < N; _j++) {
@@ -636,6 +668,7 @@ void linalg_householder_update_step_Q(float* p_q,
     }
 
 }
+*/
 
 /**
  * @brief Computes the givens rotation coefficients cosine and sine

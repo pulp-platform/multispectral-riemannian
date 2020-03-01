@@ -104,15 +104,17 @@ void linalg_householder_update_step(float* p_a,
 /**
  * @brief updates matrix Q inside the householder tridiagonalization
  *
- *     Q = Q - 2 * vvt
+ *     Q = Q - 2 * w v^T  (both v and w are assumed to be column vectors)
  *
  * @param p_q Pointer to matrix Q, of shape [N, N], is updated in place
- * @param p_vvt Pointer to matrix v v^T, only the nonzero upper right part is used
- * @param N Dimensionality of A, 2ddt and vvt
+ * @param p_v Pointer to vector v of shape [N], all values up to k+1 are assumed to be zero
+ * @param p_w Pointer to vector w of shape [N]
+ * @param N Dimensionality of Q and both vectors v and w
  * @param kp1 Part of the matrices which are zero (k + 1)
  */
 void linalg_householder_update_step_Q(float* p_q,
-                                      const float* p_vvt,
+                                      const float* p_v,
+                                      const float* p_w,
                                       unsigned int N,
                                       unsigned int kp1);
 
