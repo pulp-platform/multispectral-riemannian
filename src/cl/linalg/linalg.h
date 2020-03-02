@@ -182,8 +182,7 @@ linalg_givens_rotation_t linalg_givens_rotation_diag(float a,
 typedef struct {
     float ev1;
     float ev2;
-    float cs;
-    float sn;
+    linalg_givens_rotation_t rot;
 } linalg_evd_2x2_t;
 
 /**

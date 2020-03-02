@@ -158,8 +158,7 @@ void linalg_svd_sym_tridiag(float* p_main_diag,
         *(p_main_diag + 0) = _evd.ev1;
 
         // apply the rotation
-        linalg_givens_rotation_t _rot = {_evd.cs, _evd.sn};
-        linalg_apply_givens_rotation_f(p_q, _rot, current_pos, stride);
+        linalg_apply_givens_rotation_f(p_q, _evd.rot, current_pos, stride);
 
         // this instruction needs to be here, because GCC fails if the two instructions are one after the other
         // If GCC does not like the code like this, fall back to O2
@@ -820,23 +819,23 @@ linalg_evd_2x2_t linalg_evd_2x2(float a,
 
     if (fabs(cs) > ab) {
         ct = -tb / cs;
-        res.sn = 1.f / insn_fsqrt(insn_fmadd(ct, ct, 1.f));
-        res.cs = res.sn * ct;
+        res.rot.sn = 1.f / insn_fsqrt(insn_fmadd(ct, ct, 1.f));
+        res.rot.cs = res.rot.sn * ct;
     } else {
         if (ab == 0.f) {
-            res.cs = 1.f;
-            res.sn = 0.f;
+            res.rot.cs = 1.f;
+            res.rot.sn = 0.f;
         } else {
             tn = -cs / tb;
-            res.cs = 1.f / insn_fsqrt(insn_fmadd(tn ,tn, 1.f));
-            res.sn = tn * res.cs;
+            res.rot.cs = 1.f / insn_fsqrt(insn_fmadd(tn ,tn, 1.f));
+            res.rot.sn = tn * res.rot.cs;
         }
     }
 
     if (sgn1 == sgn2) {
-        tn = res.cs;
-        res.cs = -res.sn;
-        res.sn = tn;
+        tn = res.rot.cs;
+        res.rot.cs = -res.rot.sn;
+        res.rot.sn = tn;
     }
 
     return res;
