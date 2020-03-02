@@ -9,9 +9,10 @@
 #include "mrbci.h"
 
 #ifndef HOUSEHOLDER_SLOW
-#define _LOGM_WORKSPACE_SIZE (MRBCI_C * (MRBCI_C + 2))
+#define _LOGM_WORKSPACE_SIZE (MRBCI_C * (2 * MRBCI_C + 2))
 #else //HOUSEHOLDER_SLOW
 #define _LOGM_WORKSPACE_SIZE (MRBCI_C * (3 * MRBCI_C + 2))
+#endif
 
 /**
  * @brief compute all features from the input
@@ -78,7 +79,7 @@ void mrbci_extract_features(const int8_t* p_in,
 
         // allocate result of matrix logarithm and workspace for logm
         int8_t* _p_logm_out_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(int8_t) * MRBCI_C * MRBCI_C_ALIGN);
-        float* _p_logm_workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) _LOGM_WORKSPACE_SIZE);
+        float* _p_logm_workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * _LOGM_WORKSPACE_SIZE);
 
         // compute matrix logarithm
         mrbci_logm(_p_whitened_l1, freq_idx, _p_logm_out_l1, _p_logm_workspace_l1);
