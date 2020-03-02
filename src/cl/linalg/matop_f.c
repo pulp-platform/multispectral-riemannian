@@ -201,6 +201,118 @@ void linalg_matmul_stride_f(const float* p_a,
 
 }
 
+/**
+ * @brief Compute the matrix multiplication of two floating point matrices in parallel
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param core_id Id of the calling core
+ * @param num_workers number of cores working in parallel
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to matrix B of shape [N, O]
+ * @param M Rows of matrix A and Y
+ * @param N Rows of matrix B and columns of matrix A
+ * @param O Columns of matrix B and Y
+ * @param stride_a number of elements between the beginning of each row of matrix A, stride_a >= N
+ * @param stride_b number of elements between the beginning of each row of matrix B, stride_b >= O
+ * @param stride_y number of elements between the beginning of each row of matrix Y, stride_y >= O
+ * @param p_y Pointer to matrix Y = AB of shape [M, O]
+ */
+void linalg_matmul_stride_parallel_f(unsigned int core_id,
+                                     unsigned int num_workers,
+                                     const float* p_a,
+                                     const float* p_b,
+                                     unsigned int M,
+                                     unsigned int N,
+                                     unsigned int O,
+                                     unsigned int stride_a,
+                                     unsigned int stride_b,
+                                     unsigned int stride_y,
+                                     float* p_y) {
+
+    /*
+     * Compute N elements of the output matrix at a time, reducing the number of required elements 
+     * to load
+     */
+
+    // use iterators
+    const float* _p_a_iter;
+    const float* _p_b_iter;
+    const float* _p_a_iter_comp;
+    const float* _p_b_iter_comp;
+    float* _p_y_iter;
+
+    float _acc0;
+    float _acc1;
+    float _acc2;
+    float _acc3;
+
+    float _val_a;
+
+    unsigned int _num_block = O / 4;
+    unsigned int _rem_block = O % 4;
+
+    // loop over every output element
+    for (unsigned int _m = core_id; _m < M; _m += num_workers) {
+
+        _p_a_iter = p_a + _m * stride_a;
+        _p_b_iter = p_b;
+        _p_y_iter = p_y + _m * stride_y;
+
+        for (unsigned int _o_blk = 0; _o_blk < _num_block; _o_blk++) {
+
+            _acc0 = 0;
+            _acc1 = 0;
+            _acc2 = 0;
+            _acc3 = 0;
+            _p_a_iter_comp = _p_a_iter;
+            _p_b_iter_comp = _p_b_iter;
+
+            for (unsigned int _n = 0; _n < N; _n++) {
+                _val_a = *_p_a_iter_comp;
+
+                _acc0 = insn_fmadd(_val_a, *(_p_b_iter_comp + 0), _acc0);
+                _acc1 = insn_fmadd(_val_a, *(_p_b_iter_comp + 1), _acc1);
+                _acc2 = insn_fmadd(_val_a, *(_p_b_iter_comp + 2), _acc2);
+                _acc3 = insn_fmadd(_val_a, *(_p_b_iter_comp + 3), _acc3);
+
+                _p_a_iter_comp++;
+                _p_b_iter_comp += stride_b;
+            }
+
+            *(_p_y_iter++) = _acc0;
+            *(_p_y_iter++) = _acc1;
+            *(_p_y_iter++) = _acc2;
+            *(_p_y_iter++) = _acc3;
+
+            _p_b_iter += 4;
+        }
+
+        // compute the remaining elements
+        for (unsigned int _o = 0; _o < _rem_block; _o++) {
+
+            _acc0 = 0;
+            _p_a_iter_comp = _p_a_iter;
+            _p_b_iter_comp = _p_b_iter;
+
+            for (unsigned int _n = 0; _n < N; _n++) {
+
+                _acc0 = insn_fmadd(*_p_a_iter_comp, *_p_b_iter_comp, _acc0);
+
+                _p_a_iter_comp++;
+                _p_b_iter_comp += stride_b;
+            }
+
+            *(_p_y_iter++) = _acc0;
+            _p_b_iter++;
+
+        }
+    }
+
+    rt_team_barrier();
+
+}
+
 
 /**
  * @brief Compute the matrix multiplication of two floating point matrices, where the result
@@ -447,6 +559,74 @@ void linalg_matmul_diag_f(float* p_a,
 }
 
 /**
+ * @brief computes the matrix multiplication of a matrix A and a diagonal matrix D.
+ *
+ *     A <-- A @ D
+ *
+ * @warning The matrix A will be overwritten with the result
+ *
+ * @param core_id Id of the calling core
+ * @param num_workers number of cores working in parallel
+ * @param p_a Pointer to matrix A of shape [N, N], will be overwritten
+ * @param p_diag Pointer to diagonal vector of matrix D, of shape [N]
+ * @param N Dimension of the matrix A and length of diagonal vector D
+ */
+void linalg_matmul_diag_parallel_f(unsigned int core_id,
+                                   unsigned int num_workers,
+                                   float* p_a,
+                                   const float* p_diag,
+                                   unsigned int N) {
+
+
+    float* _p_a_iter = p_a;
+    const float* _p_diag_iter = p_diag;
+
+    float _diag;
+    float _val0, _val1, _val2, _val3;
+
+    unsigned int num_blk = N / 4;
+    unsigned int rem_blk = N % 4;
+
+    for (unsigned int _i = core_id; _i < N; _i += num_workers) {
+
+        // load the current diagonal element
+        _diag = _p_diag_iter[_i];
+        _p_a_iter = p_a + _i;
+
+        for (unsigned int _j = 0; _j < num_blk; _j++) {
+            _val0 = *(_p_a_iter + 0 * N);
+            _val1 = *(_p_a_iter + 1 * N);
+            _val2 = *(_p_a_iter + 2 * N);
+            _val3 = *(_p_a_iter + 3 * N);
+
+            _val0 = _diag * _val0;
+            _val1 = _diag * _val1;
+            _val2 = _diag * _val2;
+            _val3 = _diag * _val3;
+
+            *(_p_a_iter + 0 * N) = _val0;
+            *(_p_a_iter + 1 * N) = _val1;
+            *(_p_a_iter + 2 * N) = _val2;
+            *(_p_a_iter + 3 * N) = _val3;
+
+            _p_a_iter += 4 * N;
+        }
+
+        for (unsigned int _j = 0; _j < rem_blk; _j++) {
+            _val0 = *_p_a_iter;
+            _val0 = _diag * _val0;
+            *_p_a_iter = _val0;
+            _p_a_iter += N;
+        }
+
+    }
+
+    rt_team_barrier();
+
+}
+
+
+/**
  * @brief Compute the matrix vector multiplication. b is assumed to be a column vector
  *
  * @warning p_y must already be allocated, use L1 memory!
@@ -529,6 +709,58 @@ void linalg_matvecmul_f(const float* p_a,
 }
 
 /**
+ * @brief Compute the matrix vector multiplication in parallel. b is assumed to be a column vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param core_id id of the current core
+ * @param num_workers number of cores computing this function
+ * @param p_a Pointer to matrix A of shape [M, N]
+ * @param p_b Pointer to vector b of shape [N]
+ * @param M Rows of matrix A and length of vector y
+ * @param N columns of matrix A and length of vector b
+ * @param stride_a number of elements between the beginning of each row of matrix A, stride_a >= N
+ * @param p_y Pointer to vector y = Ab of shape [M]
+ */
+void linalg_matvecmul_parallel_f(unsigned int core_id,
+                                 unsigned int num_workers,
+                                 const float* p_a,
+                                 const float* p_b,
+                                 unsigned int M,
+                                 unsigned int N,
+                                 unsigned int stride_a,
+                                 float* p_y) {
+
+
+    const float* _p_a_iter;
+    const float* _p_b_iter;
+    float* _p_y_iter;
+
+    float _acc;
+    float _val_a;
+    float _val_b;
+
+    for (int _m = core_id; _m < M; _m += num_workers) {
+
+        _acc = 0.f;
+        _p_a_iter = p_a + _m * stride_a;
+        _p_b_iter = p_b;
+        _p_y_iter = p_y + _m;
+
+        for (int _n = 0; _n < N; _n++) {
+            _val_b = *_p_b_iter++;
+            _val_a = *_p_a_iter++;
+
+            _acc = insn_fmadd(_val_b, _val_a, _acc);
+        }
+
+        *_p_y_iter = _acc;
+    }
+
+    rt_team_barrier();
+}
+
+/**
  * @brief Compute the vector matrix multiplication. Vector a is assumed to be a row vector
  *
  * @warning p_y must already be allocated, use L1 memory!
@@ -606,6 +838,57 @@ void linalg_vecmatmul_f(const float* p_a,
 
     }
 
+}
+
+/**
+ * @brief Compute the vector matrix multiplication in parallel. Vector a is assumed to be a row vector
+ *
+ * @warning p_y must already be allocated, use L1 memory!
+ *
+ * @param core_id id of the current core
+ * @param num_workers number of cores computing this function
+ * @param p_a Pointer to vector a of shape [M]
+ * @param p_b Pointer to matrix B of shape [M, N]
+ * @param M length of vector a and columns of matrix B
+ * @param N rows of matrix B and length of vector y
+ * @param p_y Pointer to vector y = Ab of shape [N]
+ */
+void linalg_vecmatmul_parallel_f(unsigned int core_id,
+                                 unsigned int num_workers,
+                                 const float* p_a,
+                                 const float* p_b,
+                                 unsigned int M,
+                                 unsigned int N,
+                                 float* p_y) {
+
+    const float* _p_a_iter;
+    const float* _p_b_iter;
+    float* _p_y_iter;
+
+    float _acc;
+    float _val_a;
+    float _val_b;
+
+    for (int _n = core_id; _n < N; _n += num_workers) {
+
+        _acc = 0.f;
+        _p_a_iter = p_a;
+        _p_b_iter = p_b + _n;
+        _p_y_iter = p_y + _n;
+
+        for (int _m = 0; _m < M; _m++) {
+            _val_a = *_p_a_iter++;
+            _val_b = *_p_b_iter;
+
+            _p_b_iter += N;
+
+            _acc = insn_fmadd(_val_a, _val_b, _acc);
+        }
+
+        *_p_y_iter = _acc;
+    }
+
+    rt_team_barrier();
 }
 
 /**

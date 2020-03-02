@@ -9,7 +9,7 @@ from header_file import HeaderFile, HeaderConstant, HeaderArray
 from makefile import Makefile
 from functional import float_as_int_repr
 
-TESTNAME = "cl::linalg::matvecmul_f"
+TESTNAME = "cl::linalg::matvecmul_parallel_f"
 RESULT_FILE = "result.out"
 
 

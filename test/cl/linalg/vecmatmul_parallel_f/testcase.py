@@ -9,30 +9,29 @@ from header_file import HeaderFile, HeaderConstant, HeaderArray
 from makefile import Makefile
 from functional import float_as_int_repr
 
-TESTNAME = "cl::linalg::matvecmul_f"
+TESTNAME = "cl::linalg::vecmatmul_parallel_f"
 RESULT_FILE = "result.out"
 
 
-def gen_stimuli(M, N, stride_a):
+def gen_stimuli(M, N):
     """
     This function generates the stimuli (taken from actual data)
     """
-    A = (np.random.randn(M, stride_a) * 100).astype(np.float32)
-    b = (np.random.randn(N, 1) * 100).astype(np.float32)
-    y = custom_matvecmul(A, b)
-    return A, b, y
+    a = (np.random.randn(1, M) * 100).astype(np.float32)
+    B = (np.random.randn(M, N) * 100).astype(np.float32)
+    y = custom_vecmatmul(a, B)
+    return a, B, y
 
 
-def custom_matvecmul(A, b):
-    M = A.shape[0]
-    N = b.shape[0]
-    y = np.zeros((M, 1), dtype=np.float32)
+def custom_vecmatmul(a, B):
+    M, N = B.shape
+    y = np.zeros((1, N), dtype=np.float32)
 
-    for m in range(M):
+    for n in range(N):
         acc = np.float32(0)
-        for n in range(N):
-            acc += A[m, n] * b[n, 0]
-        y[m, 0] = acc
+        for m in range(M):
+            acc += a[0, m] * B[m, n]
+        y[0, n] = acc
     return y
 
 
@@ -48,11 +47,11 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for M, N, stride_a in [(22, 22, 22),
-                           (21, 21, 21),
-                           (12, 12, 12),
-                           (22, 16, 22),
-                           (16, 16, 22)]:
+    for M, N in [(22, 22),
+                 (21, 21),
+                 (12, 12),
+                 (20, 16),
+                 (19, 15)]:
 
         # generate makefile
         mkf = Makefile()
@@ -62,17 +61,16 @@ def test():
         mkf.write()
 
         # generate the stimuli
-        A, b, y = gen_stimuli(M, N, stride_a)
+        a, B, y = gen_stimuli(M, N)
 
         # prepare header file
         header = HeaderFile("test_stimuli.h")
         # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-        header.add(HeaderArray("a_stm", "uint32_t", A.ravel(), formatter=float_formatter))
-        header.add(HeaderArray("b_stm", "uint32_t", b.ravel(), formatter=float_formatter))
+        header.add(HeaderArray("a_stm", "uint32_t", a.ravel(), formatter=float_formatter))
+        header.add(HeaderArray("b_stm", "uint32_t", B.ravel(), formatter=float_formatter))
         header.add(HeaderArray("y_exp", "uint32_t", y.ravel(), formatter=float_formatter))
         header.add(HeaderConstant("M_DIM", M))
         header.add(HeaderConstant("N_DIM", N))
-        header.add(HeaderConstant("STRIDE_A", stride_a))
         header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
         header.write()
 
@@ -82,7 +80,7 @@ def test():
         # parse output
         result = parse_output(RESULT_FILE)
 
-        casename = "M={}, N={}, stride={}".format(M, N, stride_a)
+        casename = "M={}, N={}".format(M, N)
 
         # log the result
         logger.show_subcase_result(casename, result)
