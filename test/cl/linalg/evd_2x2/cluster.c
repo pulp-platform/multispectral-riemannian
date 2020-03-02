@@ -27,7 +27,7 @@ int do_bench(rt_perf_t* perf, int events) {
 
     rt_perf_stop(perf);
 
-    float max_abs_diff = insn_fmax(insn_fmax(abs_diff(cs_exp, acq.cs), abs_diff(sn_exp, acq.sn)),
+    float max_abs_diff = insn_fmax(insn_fmax(abs_diff(cs_exp, acq.rot.cs), abs_diff(sn_exp, acq.rot.sn)),
                                     insn_fmax(abs_diff(ev1_exp, acq.ev1), abs_diff(ev2_exp, acq.ev2)));
 
     printf("## 1: abs_err: %.2e\n", max_abs_diff);
