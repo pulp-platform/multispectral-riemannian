@@ -50,7 +50,9 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for fast_householder in [(False), (True)]:
+    for fast_householder, parallel in [(False, False),
+                                       (True, False),
+                                       (True, True)]:
 
         if "WOLFTEST_EXHAUSTIVE" in os.environ:
             freqs_iter = list(range(18))
@@ -72,9 +74,13 @@ def test():
             mkf.add_cl_prog_source("func/copy_mat.c")
             mkf.add_cl_prog_source("linalg/matop_f.c")
             mkf.add_cl_prog_source("linalg/svd.c")
+            mkf.add_cl_prog_source("linalg/svd_parallel.c")
 
             if not fast_householder:
                 mkf.add_define("HOUSEHOLDER_SLOW")
+
+            if parallel:
+                mkf.add_define("PARALLEL")
 
             mkf.write()
 
@@ -100,6 +106,9 @@ def test():
 
             if fast_householder:
                 casename += " + fast hh"
+
+            if parallel:
+                casename += " + par"
 
             # log the result
             logger.show_subcase_result(casename, result)

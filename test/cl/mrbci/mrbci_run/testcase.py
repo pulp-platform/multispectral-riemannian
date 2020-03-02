@@ -66,6 +66,7 @@ def test():
         mkf.add_cl_prog_source("func/convert.c")
         mkf.add_cl_prog_source("linalg/matop_f.c")
         mkf.add_cl_prog_source("linalg/svd.c")
+        mkf.add_cl_prog_source("linalg/svd_parallel.c")
 
         if not fast_householder:
             mkf.add_define("HOUSEHOLDER_SLOW")
