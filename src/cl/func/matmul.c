@@ -28,8 +28,11 @@ void func_matmul_sqr_i16(const int16_t* p_a,
                          unsigned int N,
                          int32_t* p_y) {
 
+#ifdef PARALLEL
+    plp_mat_mult_i16_parallel(p_a, p_b, N, N, N, 8, p_y);
+#else //PARALLEL
     plp_mat_mult_i16(p_a, p_b, N, N, N, p_y);
-    //plp_mat_mult_i16_parallel(p_a, p_b, N, N, N, 8, p_y);
+#endif //PARALLEL
 
 }
 
@@ -48,7 +51,10 @@ void func_matmul_sqr_i32(const int32_t* p_a,
                          unsigned int N,
                          int32_t* p_y) {
 
+#ifdef PARALLEL
+    plp_mat_mult_i32_parallel(p_a, p_b, N, N, N, 8, p_y);
+#else //PARALLEL
     plp_mat_mult_i32(p_a, p_b, N, N, N, p_y);
-    //plp_mat_mult_i32_parallel(p_a, p_b, N, N, N, 8, p_y);
+#endif //PARALLEL
 
 }

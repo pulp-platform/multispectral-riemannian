@@ -14,11 +14,23 @@
  * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
  *            contains the matrix logarithm of A
  * @param N Dimension of matrix A
- * @param p_workspace Temporary storage required for computation, requires (N * (3N + 2) space
+ * @param p_workspace Temporary storage required for computation, requires (N * (N + 2) space
  */
 void linalg_logm(float* p_a,
                  unsigned int N,
                  float* p_workspace);
+
+/**
+ * @brief Compute the matrix logarithm of a matrix in parallel by computing the SVD first.
+ *
+ * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
+ *            contains the matrix logarithm of A
+ * @param N Dimension of matrix A
+ * @param p_workspace Temporary storage required for computation, requires (N * (N + 2) space
+ */
+void linalg_logm_parallel(float* p_a,
+                          unsigned int N,
+                          float* p_workspace);
 
 /**
  * @brief Compute the SVD of a symmetric matrix.
@@ -32,7 +44,7 @@ void linalg_logm(float* p_a,
  *            the unit matrix I or a different orthogonal matrix. After returning, this matrix
  *            contains the eigenvectors of the matrix A.
  * @param N Dimension of matrix A
- * @param p_workspace Temporary storage required for computation, requires (N * (2N + 2) space
+ * @param p_workspace Temporary storage required for computation, requires (N * 2) space
  */
 void linalg_svd_sym(float* p_a,
                     float* p_q,

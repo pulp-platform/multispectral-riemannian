@@ -8,6 +8,11 @@
 #include "rt/rt_api.h"
 #include "mrbci.h"
 
+#ifndef HOUSEHOLDER_SLOW
+#define _LOGM_WORKSPACE_SIZE (MRBCI_C * (MRBCI_C + 2))
+#else //HOUSEHOLDER_SLOW
+#define _LOGM_WORKSPACE_SIZE (MRBCI_C * (3 * MRBCI_C + 2))
+
 /**
  * @brief compute all features from the input
  *
@@ -73,7 +78,7 @@ void mrbci_extract_features(const int8_t* p_in,
 
         // allocate result of matrix logarithm and workspace for logm
         int8_t* _p_logm_out_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(int8_t) * MRBCI_C * MRBCI_C_ALIGN);
-        float* _p_logm_workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) * MRBCI_C * (3 * MRBCI_C + 1));
+        float* _p_logm_workspace_l1 = rt_alloc(RT_ALLOC_CL_DATA, sizeof(float) _LOGM_WORKSPACE_SIZE);
 
         // compute matrix logarithm
         mrbci_logm(_p_whitened_l1, freq_idx, _p_logm_out_l1, _p_logm_workspace_l1);
@@ -82,7 +87,7 @@ void mrbci_extract_features(const int8_t* p_in,
         rt_free(RT_ALLOC_CL_DATA, _p_whitened_l1, sizeof(int32_t) * MRBCI_C * MRBCI_C);
 
         // free logm workspace
-        rt_free(RT_ALLOC_CL_DATA, _p_logm_workspace_l1, sizeof(float) * MRBCI_C * (3 * MRBCI_C + 1));
+        rt_free(RT_ALLOC_CL_DATA, _p_logm_workspace_l1, sizeof(float) * _LOGM_WORKSPACE_SIZE);
 
         // compute hald diagonalization
         mrbci_half_diag(_p_logm_out_l1, _p_out_l1_iter);
