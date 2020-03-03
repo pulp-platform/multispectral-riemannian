@@ -23,8 +23,6 @@ int do_bench(rt_perf_t* perf, int events) {
         if (y_acq[k] != y_exp[k]) {
             error = 1;
             printf("error at: %d: diff=%d, acq=%d, exp=%d\n", k, y_acq[k] - y_exp[k], y_acq[k], y_exp[k]);
-        } else {
-            printf("OK\n");
         }
     }
 

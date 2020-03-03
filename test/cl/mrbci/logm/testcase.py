@@ -54,6 +54,8 @@ def test():
                                        (True, False),
                                        (True, True)]:
 
+        cycles = []
+
         if "WOLFTEST_EXHAUSTIVE" in os.environ:
             freqs_iter = list(range(18))
         else:
@@ -102,6 +104,8 @@ def test():
             # parse output
             result = parse_output(RESULT_FILE)
 
+            cycles.append(int(result['1']['cycles']))
+
             casename = "freq {:02d}".format(freq_idx)
 
             if fast_householder:
@@ -112,6 +116,8 @@ def test():
 
             # log the result
             logger.show_subcase_result(casename, result)
+
+        print("Average Cycles: {}".format(np.array(cycles).mean()))
 
     # return summary
     return logger.summary()
