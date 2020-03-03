@@ -46,6 +46,19 @@ void mrbci_extract_features(const int8_t* p_in,
                             int8_t* p_out);
 
 /**
+ * @brief compute the features from the input for a given frequency band
+ *
+ * @warning p_in is not allowed to be in L1, it must reside in L2 memory. p_out however must be in L1.
+ * 
+ * @param p_in Pointer to the input matrix of shape [C, T], aligned to [C, T_ALIGN] in L2.
+ * @param freq_idx Frequency id, 0 <= freq_idx < N_FREQ
+ * @param p_out Pointer to the entire result vector (of shape MRBCI_HALF_DIAG_NUM_FEATURES) in L1.
+ */
+void mrbci_extract_features_in_band(const int8_t* p_in,
+                                    unsigned int freq_idx,
+                                    int8_t* p_out);
+
+/**
  * @brief compute SVM (matrix multiplication followed by vector addition)
  *
  * @warning p_in and p_out must reside on L2 memory, not on L1.

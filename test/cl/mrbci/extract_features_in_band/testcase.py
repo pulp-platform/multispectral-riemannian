@@ -3,8 +3,8 @@ This file will test the convolution implementation
 """
 
 import random
-import os
 import numpy as np
+import os
 import pickle
 from test_utils import parse_output, TestLogger
 from header_file import HeaderFile, HeaderConstant, HeaderArray, HeaderInclude, HeaderScalar, \
@@ -13,35 +13,26 @@ from golden_model import GoldenModel
 from makefile import Makefile
 import functional as F
 
-TESTNAME = "cl::mrbci::covmat"
+TESTNAME = "cl::mrbci::extract_features_in_band"
 RESULT_FILE = "result.out"
 
 MODEL_FILENAME = "../../../../data/model.pkl"
 DATA_FILENAME = "../../../../data/verification.pkl"
 
-
-def gen_stimuli(freq_idx=None):
+def gen_stimuli(freq_idx):
     """
     This function generates the stimuli
     """
     model = GoldenModel(MODEL_FILENAME)
-
-    if freq_idx is None:
-        freq_idx = random.randint(0, model.n_freq - 1)
-
-    block = model.feature_extraction.freq_band[freq_idx].cov_mat
+    block = model.feature_extraction.freq_band[freq_idx]
 
     with open(DATA_FILENAME, 'rb') as _f:
         data = pickle.load(_f)
 
-    X = F.quantize_to_int(data['filter_out'][freq_idx], block.input_scale, block.input_n_bits,
-                          do_round=True)
-    Y = F.quantize_to_int(data['cov_mat_reg_quant'][freq_idx], block.output_scale,
-                          block.output_n_bits, do_round=True)
+    X = F.quantize_to_int(data['input_quant'], block.input_scale, block.input_n_bits, do_round=True)
+    Y = block(X)
 
-    assert np.all(block(X) == Y)
-
-    return X, Y, block
+    return X, Y
 
 
 def test():
@@ -52,8 +43,9 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for parallel in [(False),
-                     (True)]:
+    for fast_householder, parallel in [(False, False),
+                                       (True, False),
+                                       (True, True)]:
 
         if "WOLFTEST_EXHAUSTIVE" in os.environ:
             freqs_iter = list(range(18))
@@ -70,8 +62,23 @@ def test():
             mkf.add_cl_test_source("cluster.c")
             mkf.add_cl_prog_source("mrbci/mrbci_params.c")
             mkf.add_cl_prog_source("mrbci/mrbci.c")
+            mkf.add_cl_prog_source("mrbci/filter.c")
             mkf.add_cl_prog_source("mrbci/covmat.c")
+            mkf.add_cl_prog_source("mrbci/whitening.c")
+            mkf.add_cl_prog_source("mrbci/logm.c")
+            mkf.add_cl_prog_source("mrbci/half_diag.c")
+            mkf.add_cl_prog_source("mrbci/feature_extraction.c")
+            mkf.add_cl_prog_source("func/sos_filt.c")
+            mkf.add_cl_prog_source("func/copy_mat.c")
             mkf.add_cl_prog_source("func/covmat.c")
+            mkf.add_cl_prog_source("func/matmul.c")
+            mkf.add_cl_prog_source("func/convert.c")
+            mkf.add_cl_prog_source("linalg/matop_f.c")
+            mkf.add_cl_prog_source("linalg/svd.c")
+            mkf.add_cl_prog_source("linalg/svd_parallel.c")
+
+            if not fast_householder:
+                mkf.add_define("HOUSEHOLDER_SLOW")
 
             if parallel:
                 mkf.add_define("PARALLEL")
@@ -79,14 +86,15 @@ def test():
             mkf.write()
 
             # generate the stimuli
-            X, Y, _ = gen_stimuli(freq_idx)
+            # X, Y = gen_stimuli(freq_idx)
+            X, Y = gen_stimuli(freq_idx)
             X_align = align_array(X)
 
             # prepare header file
             header = HeaderFile("test_stimuli.h")
             # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
             header.add(HeaderArray("x_stm", "int8_t", X_align.ravel()))
-            header.add(HeaderArray("y_exp", "int16_t", Y.ravel()))
+            header.add(HeaderArray("y_exp", "int8_t", Y.ravel()))
             header.add(HeaderConstant("FREQ_IDX", freq_idx))
             header.write()
 
@@ -97,6 +105,9 @@ def test():
             result = parse_output(RESULT_FILE)
 
             casename = "freq {:02d}".format(freq_idx)
+
+            if fast_householder:
+                casename += " + fast hh"
 
             if parallel:
                 casename += " + par"
