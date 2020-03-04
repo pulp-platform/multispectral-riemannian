@@ -48,40 +48,48 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for N in [14, 16, 18, 20, 22]:
+    for slow_householder in [True, False]:
+        for N in [14, 16, 18, 20, 22]:
 
-        # generate makefile
-        mkf = Makefile()
-        mkf.add_fc_test_source("test.c")
-        mkf.add_cl_test_source("cluster.c")
-        mkf.add_cl_prog_source("linalg/svd.c")
-        mkf.add_cl_prog_source("linalg/matop_f.c")
-        mkf.add_cl_prog_source("func/copy_mat.c")
-        mkf.write()
+            # generate makefile
+            mkf = Makefile()
+            mkf.add_fc_test_source("test.c")
+            mkf.add_cl_test_source("cluster.c")
+            mkf.add_cl_prog_source("linalg/svd.c")
+            mkf.add_cl_prog_source("linalg/matop_f.c")
+            mkf.add_cl_prog_source("func/copy_mat.c")
 
-        # generate the stimuli
-        A, L, T, R = gen_stimuli(N)
+            if slow_householder:
+                mkf.add_define("HOUSEHOLDER_SLOW")
 
-        # prepare header file
-        header = HeaderFile("test_stimuli.h")
-        # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
-        header.add(HeaderArray("a_stm", "uint32_t", A.ravel(), formatter=float_formatter))
-        header.add(HeaderArray("q_exp", "uint32_t", L.ravel(), formatter=float_formatter))
-        header.add(HeaderArray("t_exp", "uint32_t", T.ravel(), formatter=float_formatter))
-        header.add(HeaderConstant("N_DIM", N))
-        header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
-        header.write()
+            mkf.write()
 
-        # compile and run
-        os.system("make clean all run > {}".format(RESULT_FILE))
+            # generate the stimuli
+            A, L, T, R = gen_stimuli(N)
 
-        # parse output
-        result = parse_output(RESULT_FILE)
+            # prepare header file
+            header = HeaderFile("test_stimuli.h")
+            # header.add(HeaderInclude("../../../../src/cl/func/functional.h"))
+            header.add(HeaderArray("a_stm", "uint32_t", A.ravel(), formatter=float_formatter))
+            header.add(HeaderArray("q_exp", "uint32_t", L.ravel(), formatter=float_formatter))
+            header.add(HeaderArray("t_exp", "uint32_t", T.ravel(), formatter=float_formatter))
+            header.add(HeaderConstant("N_DIM", N))
+            header.add(HeaderConstant("EPSILON", logger.epsilon_str()))
+            header.write()
 
-        casename = "N={}".format(N)
+            # compile and run
+            os.system("make clean all run > {}".format(RESULT_FILE))
 
-        # log the result
-        logger.show_subcase_result(casename, result)
+            # parse output
+            result = parse_output(RESULT_FILE)
+
+            casename = "N={}".format(N)
+
+            if not slow_householder:
+                casename += " + fast HH"
+
+            # log the result
+            logger.show_subcase_result(casename, result)
 
     # return summary
     return logger.summary()
