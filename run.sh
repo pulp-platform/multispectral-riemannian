@@ -56,7 +56,7 @@ cd data
 
 # generate net header file
 python3.8 generate_mrbci_header.py
-# python3 gen_input_header.py
+python3.8 generate_input_header.py
 
 # leave data directory
 cd ..
