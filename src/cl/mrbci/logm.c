@@ -34,12 +34,13 @@ void mrbci_logm(int32_t* p_in,
 
     // compute matrix logarithm
 #ifdef PARALLEL
-    linalg_logm_parallel(p_float, MRBCI_C, p_workspace);
+//linalg_logm_parallel(p_float, MRBCI_C, p_workspace);
+linalg_logm(p_float, MRBCI_C, p_workspace);
 #else //PARALLEL
-    linalg_logm(p_float, MRBCI_C, p_workspace);
+linalg_logm(p_float, MRBCI_C, p_workspace);
 #endif //PARALLEL
 
-    // requantize the values
-    func_convert_f_to_i8(p_float, p_out, MRBCI_C, MRBCI_C, MRBCI_C_ALIGN, requant_factor);
+// requantize the values
+func_convert_f_to_i8(p_float, p_out, MRBCI_C, MRBCI_C, MRBCI_C_ALIGN, requant_factor);
 
 }
