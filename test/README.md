@@ -2,6 +2,17 @@
 
 This folder contains the necessary codes for thesting the functions. The main test script `run_test.py` searches recursively all files in the directiory `[project_root]/tests` for python scripts called `testcase.py`, and executes the function `testcase.test()`.
 
+## Usage
+
+For running the tests, it is important to change the current directory into the test folder:
+
+```
+cd test
+./run_test [-b] [folder]
+```
+
+Then, you can execute the tests by running `./run_test.sh`. This script accepts some arguments. If no arguments provided, the script will run all tests on GVSOC. However, if you provide a relative path afterwards, it will only execute all tests which are found in this directory (and subdirectories, recursively). If you pass the parameter `-b`, the tests are executed on the board. See `./run_test.sh -h` for more information.
+
 ## `testcase.py`
 
 This file contains all the information needed for a single testcase. The main function is the function `test()`, which is called by `run_test.py`. Before this function is executed, the current directory is changed to the location of `testcase.py`.The following should be done inside the `test()` function:
