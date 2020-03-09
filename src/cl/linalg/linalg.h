@@ -14,7 +14,7 @@
  * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
  *            contains the matrix logarithm of A
  * @param N Dimension of matrix A
- * @param p_workspace Temporary storage required for computation, requires (N * (N + 2) space
+ * @param p_workspace Temporary storage required for computation, requires (N * (2 * N + 2) space
  */
 void linalg_logm(float* p_a,
                  unsigned int N,
@@ -26,7 +26,7 @@ void linalg_logm(float* p_a,
  * @param p_a Pointer to matrix A of shape [N, N], must be symmetric. After returning, this matrix
  *            contains the matrix logarithm of A
  * @param N Dimension of matrix A
- * @param p_workspace Temporary storage required for computation, requires (N * (N + 2) space
+ * @param p_workspace Temporary storage required for computation, requires (N * (2 * N + 2) space
  */
 void linalg_logm_parallel(float* p_a,
                           unsigned int N,
