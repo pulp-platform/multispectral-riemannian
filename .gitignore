@@ -102,3 +102,6 @@ ENV/
 
 # ignore dataset folder (symlink)
 dataset
+
+# ignore measurements
+measurements

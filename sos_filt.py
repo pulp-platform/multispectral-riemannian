@@ -4,6 +4,7 @@ __author__ = "Tibor Schneider"
 __email__ = "sctibor@student.ethz.ch"
 
 import numpy as np
+import pandas as pd
 import os
 import cffi
 
@@ -120,9 +121,11 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_rese
     for m in range(M):
         # compute the scale and the shift
         a_scale = np.abs(coeff[m, 3:]).max()
+        print(a_scale)
         a_shift = int(np.ceil(np.log2(a_scale)))
         a_scale = 2 ** a_shift
         b_scale = np.abs(coeff[m, :3]).max()
+        print(b_scale)
         b_shift = int(np.ceil(np.log2(b_scale)))
         b_scale = 2 ** b_shift
 
@@ -465,7 +468,7 @@ def _par_measure(w, t, coeff, n_filter_bits=None, bit_reserve=None):
 
 def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     if freqs is None:
-        freqs = np.linspace(0, np.pi / 2, N)
+        freqs = np.linspace(0, np.pi, N)
 
     t = np.array(range(T))
 
@@ -487,6 +490,12 @@ def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     ax.legend()
     #ax.set_yscale('log')
     plt.show()
+
+    # export the data as csv
+    df = pd.DataFrame({'f': freqs,
+                       'float': ampl_exp_f,
+                       'quant': ampl_acq})
+    df.to_csv(f'measurements/sweep_{band_id[0]}-{band_id[1]}_N{N_FILTER_BITS}.csv')
 
 
 def _find_best_params(filter_bank):
