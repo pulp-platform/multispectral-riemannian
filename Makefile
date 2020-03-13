@@ -42,4 +42,7 @@ PULP_CFLAGS += -DUSE_FUSED_FPU
 # PULP_CFLAGS += -DUSE_SOFT_SQRTDIV
 # PULP_CFLAGS += -mno-fdiv
 
+# do Power Measurement
+# PULP_CFLAGS += "-DPOWER"
+
 include $(PULP_SDK_HOME)/install/rules/pulp_rt.mk
