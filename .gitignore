@@ -4,3 +4,5 @@
 */__pycache__/*
 src/cl/mrbci/mrbci_params.c
 src/cl/mrbci/mrbci_params.h
+
+*.ods\#
