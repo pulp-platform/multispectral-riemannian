@@ -121,11 +121,9 @@ def prepare_quant_filter(coeff, x_scale, y_scale, n_bits=N_FILTER_BITS, bit_rese
     for m in range(M):
         # compute the scale and the shift
         a_scale = np.abs(coeff[m, 3:]).max()
-        print(a_scale)
         a_shift = int(np.ceil(np.log2(a_scale)))
         a_scale = 2 ** a_shift
         b_scale = np.abs(coeff[m, :3]).max()
-        print(b_scale)
         b_shift = int(np.ceil(np.log2(b_scale)))
         b_scale = 2 ** b_shift
 
@@ -468,7 +466,8 @@ def _par_measure(w, t, coeff, n_filter_bits=None, bit_reserve=None):
 
 def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     if freqs is None:
-        freqs = np.linspace(0, np.pi, N)
+        # freqs = np.linspace(1e-3, np.pi, N)
+        freqs = np.logspace(-4, 1, N, base=np.pi)
 
     t = np.array(range(T))
 
@@ -488,7 +487,8 @@ def _sweep(band_id, coeff, freqs=None, N=1000, T=1000, fs=250):
     ax.plot(freqs, ampl_exp_q, label="quantized weights")
     ax.plot(freqs, ampl_acq, label="fully quantized")
     ax.legend()
-    #ax.set_yscale('log')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
     plt.show()
 
     # export the data as csv
@@ -583,7 +583,7 @@ def _test():
     bank = load_filterbank([2], fs=250, order=2)
     # _find_best_params(bank)
     for band, coeff in zip(bands, bank):
-        _plot(band, coeff)
+        # _plot(band, coeff)
         _sweep(band, coeff)
 
 
