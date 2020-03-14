@@ -29,6 +29,21 @@ float abs_diff(float exp, float acq) {
     return abs_diff;
 }
 
+#ifdef PARALLEL
+
+#ifndef NUM_WORKERS
+#define NUM_WORKERS 8
+#endif//NUM_WORKERS
+
+// forward declaration
+void _linalg_kernel_householder_tridiagonal(unsigned int core_id, float* p_a, float* p_q, unsigned int N, float* p_workspace);
+
+void bench_kernel(void* args) {
+    unsigned int core_id = rt_core_id();
+    _linalg_kernel_householder_tridiagonal(core_id, a_stm_l1, q_acq_l1, N_DIM, workspace_l1);
+}
+#endif//PARALLEL
+
 
 int do_bench(rt_perf_t* perf, int events) {
     //setup performance measurement
@@ -38,7 +53,11 @@ int do_bench(rt_perf_t* perf, int events) {
     rt_perf_reset(perf);
     rt_perf_start(perf);
 
+#ifdef PARALLEL
+    rt_team_fork(NUM_WORKERS, bench_kernel, NULL);
+#else//PARALLEL
     linalg_householder_tridiagonal(a_stm_l1, q_acq_l1, N_DIM, workspace_l1);
+#endif//PARALLEL
 
     rt_perf_stop(perf);
 

@@ -48,7 +48,7 @@ def test():
 
     logger = TestLogger(TESTNAME)
 
-    for slow_householder in [True, False]:
+    for slow_householder, parallel in [(True, False), (False, False), (False, True)]:
         for N in [14, 16, 18, 20, 22]:
 
             # generate makefile
@@ -56,11 +56,14 @@ def test():
             mkf.add_fc_test_source("test.c")
             mkf.add_cl_test_source("cluster.c")
             mkf.add_cl_prog_source("linalg/svd.c")
+            mkf.add_cl_prog_source("linalg/svd_parallel.c")
             mkf.add_cl_prog_source("linalg/matop_f.c")
             mkf.add_cl_prog_source("func/copy_mat.c")
 
             if slow_householder:
                 mkf.add_define("HOUSEHOLDER_SLOW")
+            if parallel:
+                mkf.add_define("PARALLEL")
 
             mkf.write()
 
@@ -87,6 +90,9 @@ def test():
 
             if not slow_householder:
                 casename += " + fast HH"
+
+            if parallel:
+                casename += " + par"
 
             # log the result
             logger.show_subcase_result(casename, result)
