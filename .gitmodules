@@ -1,3 +1,0 @@
-[submodule "python"]
-	path = multiscale_bci_python
-	url = https://iis-git.ee.ethz.ch/sctibor/multiscale-bci-python
