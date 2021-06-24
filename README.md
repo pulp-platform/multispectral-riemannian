@@ -60,4 +60,4 @@ Add the option `b` to execute the code on the Board. The parameter `f` keeps the
 
 # License and Attribution
 
-This repository is released under the Apache-2.0 license, see LICENSE file for details, except for the codes in the folder `multiscale_bci_python` which is developed based on [MultiScale-BCI/IV-2a](https://github.com/MultiScale-BCI/IV-2a) repository, released under MIT License.
+This repository is released under the Apache-2.0 license, see LICENSE file for details, except for the codes in the folder `multiscale_bci_python` which is developed based on [MultiScale-BCI/IV-2a](https://github.com/MultiScale-BCI/IV-2a) repository, released under MIT License. Refer to the original repository for more details.
