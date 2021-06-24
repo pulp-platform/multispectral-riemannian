@@ -1,6 +1,22 @@
+Copyright (C) 2020 ETH Zurich, Switzerland. Refer to paragraph `License and Attribution` below for information on the license.
+
 # multiscale-bci-wolf
 
-Implementation of the quantized Multiscale Riemannian Classifier on Mr Wolf
+Implementation of the quantized Multiscale Riemannian Classifier on Mr Wolf.
+
+This project was developed by Tibor Schneider during his Semester thesis at ETH Zurich under the supervision of Xiaying Wang, Michael Hersche, and Lukas Cavigelli.
+
+For more details, please read the paper *Q-EEGNet: an Energy-Efficient 8-bit Quantized Parallel EEGNet Implementation for Edge Motor-Imagery Brain--Machine Interfaces* available on [IEEE Xplore](https://ieeexplore.ieee.org/document/9401564) and on [arXiv](https://arxiv.org/abs/2102.11221). If you find this work useful in your research, please cite
+```
+@INPROCEEDINGS{9401564,
+author={Wang, Xiaying and Schneider, Tibor and Hersche, Michael and Cavigelli, Lukas and Benini, Luca},
+booktitle={2021 IEEE International Symposium on Circuits and Systems (ISCAS)},
+title={Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain??Machine Interfaces},
+year={2021},
+pages={1-5},
+doi={10.1109/ISCAS51556.2021.9401564}
+}
+```
 
 # Requirements
 
@@ -17,13 +33,7 @@ python3.8 -e pip install numpy scipy sklearn pyriemann matplotlib tqdm cffi
 
 # Setup
 
-First, get all the submodules
-
-```
-git submodule update --init --recursive
-```
-
-Then, compile the shared library for the python model:
+First, compile the shared library for the python model:
 
 ```
 cd multiscale_bci_python
@@ -47,3 +57,7 @@ Then, you can run it with :
 ```
 
 Add the option `b` to execute the code on the Board. The parameter `f` keeps the compiler from using the FMA unit. Also, the option `d` forces the compiler to use soft division ans square root. See the help page displayed with `./run.sh -h`.
+
+# License and Attribution
+
+This repository is released under the Apache-2.0 license, see LICENSE file for details, except for the codes in the folder `multiscale_bci_python` which is developed based on [MultiScale-BCI/IV-2a](https://github.com/MultiScale-BCI/IV-2a) repository, released under MIT License.
