@@ -6,12 +6,12 @@ Implementation of the quantized Multiscale Riemannian Classifier on Mr Wolf.
 
 This project was developed by Tibor Schneider during his Semester thesis at ETH Zurich under the supervision of Xiaying Wang, Michael Hersche, and Lukas Cavigelli.
 
-For more details, please read the paper *Q-EEGNet: an Energy-Efficient 8-bit Quantized Parallel EEGNet Implementation for Edge Motor-Imagery Brain--Machine Interfaces* available on [IEEE Xplore](https://ieeexplore.ieee.org/document/9401564) and on [arXiv](https://arxiv.org/abs/2102.11221). If you find this work useful in your research, please cite
+For more details, please read the paper *Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain--Machine Interfaces* available on [IEEE Xplore](https://ieeexplore.ieee.org/document/9401564) and on [arXiv](https://arxiv.org/abs/2102.11221). If you find this work useful in your research, please cite
 ```
 @INPROCEEDINGS{9401564,
 author={Wang, Xiaying and Schneider, Tibor and Hersche, Michael and Cavigelli, Lukas and Benini, Luca},
 booktitle={2021 IEEE International Symposium on Circuits and Systems (ISCAS)},
-title={Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain??Machine Interfaces},
+title={Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain--Machine Interfaces},
 year={2021},
 pages={1-5},
 doi={10.1109/ISCAS51556.2021.9401564}
@@ -56,7 +56,7 @@ Then, you can run it with :
 ./run.sh [-bfd]
 ```
 
-Add the option `b` to execute the code on the Board. The parameter `f` keeps the compiler from using the FMA unit. Also, the option `d` forces the compiler to use soft division ans square root. See the help page displayed with `./run.sh -h`.
+Add the option `b` to execute the code on the Board. The parameter `f` keeps the compiler from using the FMA unit. Also, the option `d` forces the compiler to use soft division and square root. See the help page displayed with `./run.sh -h`.
 
 # License and Attribution
 
