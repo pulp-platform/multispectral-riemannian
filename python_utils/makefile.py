@@ -29,7 +29,7 @@ __copyright__ = """
 import os
 
 FILES_IN_ROOT = {'data', 'src', 'README.md', 'test', 'Makefile', 'python_utils', '.gitignore',
-                 'run.sh', 'multiscale_bci_python', '.gitmodules'}
+                 'run.sh', 'multiscale_bci_python'}
 
 
 class Makefile:

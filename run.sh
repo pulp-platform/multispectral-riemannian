@@ -42,6 +42,8 @@ while getopts "bp:nwtfde:h" name; do
     esac
 done
 
+# to be able to use conda activate in bash scripts
+source ~/miniconda3/etc/profile.d/conda.sh
 
 if [ "$TRAIN" = true ]; then
     printf "Training the network...\n\n"
@@ -49,8 +51,14 @@ if [ "$TRAIN" = true ]; then
     # enter python bci directory
     cd multiscale_bci_python
 
+    # activate the environment for python3.8
+    conda activate mrc
+
     # train the network (for one subject only) and export the data to the ../data directory
     python3.8 main_riemannian.py -e -f ../data
+
+    # deactivate pyhon3.8 env and go with python2.7 and python3.5/3.6 env
+    conda deactivate
 
     # go back to the root hdirectory
     cd ..
@@ -72,9 +80,13 @@ export PYTHONPATH=$(pwd)/python_utils:$(pwd)/multiscale_bci_python:$PYTHONPATH
 # enter data directory
 cd data
 
+conda activate mrc
+
 # generate net header file
 python3.8 generate_mrbci_header.py
 python3.8 generate_input_header.py
+
+conda deactivate
 
 # leave data directory
 cd ..

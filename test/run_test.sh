@@ -98,4 +98,11 @@ export PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
 # always store the trace file
 # PULP_CURRENT_CONFIG_ARGS+=" gvsoc/trace=l2_priv:$(pwd)/../build/trace.txt"
 
+# activate the environment for python3.8
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate mrc
+
 python3.8 run_test.py $ROOT
+
+# deactivate pyhon3.8 env and go with python2.7 and python3.5/3.6 env
+conda deactivate

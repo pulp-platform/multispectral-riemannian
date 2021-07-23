@@ -52,7 +52,7 @@ def test():
         mkf.write()
 
         # compile and run
-        os.system("make clean all run > {}".format(RESULT_FILE))
+        os.system(". ~/miniconda3/etc/profile.d/conda.sh && conda deactivate && make clean all run > {} && conda activate mrc".format(RESULT_FILE))
 
         # parse output
         result = parse_output(RESULT_FILE)
