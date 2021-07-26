@@ -111,7 +111,7 @@ def test():
             header.write()
 
             # compile and run. To do that, you need the env for pulp.
-            os.system(". ~/miniconda3/etc/profile.d/conda.sh && conda deactivate && make clean all run > {} && conda activate mrc".format(RESULT_FILE))
+            os.system(". $CONDA_BASE_PREFIX/etc/profile.d/conda.sh && conda deactivate && make clean all run > {} && conda activate mrc".format(RESULT_FILE))
 
             # parse output
             result = parse_output(RESULT_FILE)

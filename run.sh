@@ -43,7 +43,7 @@ while getopts "bp:nwtfde:h" name; do
 done
 
 # to be able to use conda activate in bash scripts
-source ~/miniconda3/etc/profile.d/conda.sh
+source $CONDA_BASE_PREFIX/etc/profile.d/conda.sh
 
 if [ "$TRAIN" = true ]; then
     printf "Training the network...\n\n"

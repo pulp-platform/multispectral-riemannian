@@ -22,7 +22,6 @@
 #include "rt/rt_api.h"
 #include "test_stimuli.h"
 #include "../../../src/cl/insn.h"
-#include "math.h"
 
 RT_CL_DATA static float* a_stm_l1;
 
