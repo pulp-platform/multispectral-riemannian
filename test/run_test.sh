@@ -52,9 +52,9 @@ done
 cd ..
 printf "Building the main project...\n"
 if [ "$TRAIN" = true ]; then
-    bash run.sh -n -t
+    bash run.sh -n -t -v
 else
-    bash run.sh -n > /dev/null
+    bash run.sh -n -v > /dev/null
 fi
 cd test
 
@@ -99,10 +99,14 @@ export PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
 # PULP_CURRENT_CONFIG_ARGS+=" gvsoc/trace=l2_priv:$(pwd)/../build/trace.txt"
 
 # activate the environment for python3.8
-source ~/miniconda3/etc/profile.d/conda.sh
+source $CONDA_BASE_PREFIX/etc/profile.d/conda.sh
 conda activate mrc
 
-python3.8 run_test.py $ROOT
+if [ -z "${ROOT}" ]; then
+    python3.8 run_test.py -p $PLATFORM
+else
+    python3.8 run_test.py -d $ROOT -p $PLATFORM
+fi
 
 # deactivate pyhon3.8 env and go with python2.7 and python3.5/3.6 env
 conda deactivate

@@ -64,7 +64,7 @@ def gen_stimuli(freq_idx=None):
     return X, Y, block
 
 
-def test():
+def test(platform):
     """
     Execute the tests
     Returns: (n_total, n_success)
@@ -85,7 +85,7 @@ def test():
         for freq_idx in freqs_iter:
 
             # generate makefile
-            mkf = Makefile()
+            mkf = Makefile(use_vega=True)
             mkf.add_fc_test_source("test.c")
             mkf.add_cl_test_source("cluster.c")
             mkf.add_cl_prog_source("mrbci/mrbci_params.c")
@@ -111,7 +111,7 @@ def test():
             header.write()
 
             # compile and run. To do that, you need the env for pulp.
-            os.system(". ~/miniconda3/etc/profile.d/conda.sh && conda deactivate && make clean all run > {} && conda activate mrc".format(RESULT_FILE))
+            os.system(". $CONDA_BASE_PREFIX/etc/profile.d/conda.sh && conda deactivate && make clean all run PMSIS_OS=pulp-os platform={} > {} && conda activate mrc".format(platform, RESULT_FILE))
 
             # parse output
             result = parse_output(RESULT_FILE)

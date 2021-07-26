@@ -45,7 +45,7 @@ def gen_stimuli(N):
     return A, B, Y
 
 
-def test():
+def test(platform):
     """
     Execute the tests
     Returns: (n_total, n_success)
@@ -56,7 +56,7 @@ def test():
     for N in [12, 16, 19, 20, 21, 22]:
 
         # generate makefile
-        mkf = Makefile()
+        mkf = Makefile(use_vega=True)
         mkf.add_fc_test_source("test.c")
         mkf.add_cl_test_source("cluster.c")
         mkf.add_cl_prog_source("func/matmul.c")
@@ -75,7 +75,7 @@ def test():
         header.write()
 
         # compile and run
-        os.system(". ~/miniconda3/etc/profile.d/conda.sh && conda deactivate && make clean all run > {} && conda activate mrc".format(RESULT_FILE))
+        os.system(". $CONDA_BASE_PREFIX/etc/profile.d/conda.sh && conda deactivate && make clean all run PMSIS_OS=pulp-os platform={} > {} && conda activate mrc".format(platform, RESULT_FILE))
 
         # parse output
         result = parse_output(RESULT_FILE)

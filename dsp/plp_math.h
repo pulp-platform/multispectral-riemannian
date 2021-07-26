@@ -36,6 +36,25 @@ typedef struct {
 
 
 /** -------------------------------------------------------
+    @brief      Glue code for matrix matrix multiplication of a 32-bit integer matrices.
+    @param[in]  pSrcA points to first the input matrix
+    @param[in]  pSrcB points to second the input matrix
+    @param[in]  M     Height of first matrix
+    @param[in]  N     Width of first and heigt of second matrix
+    @param[in]  O     Width of second matrix
+    @param[out] pDstC Output is written here
+    @return     none
+*/
+
+void plp_mat_mult_i32(const int32_t *__restrict__ pSrcA,
+                      const int32_t *__restrict__ pSrcB,
+                      uint32_t M,
+                      uint32_t N,
+                      uint32_t O,
+                      int32_t *__restrict__ pDstC);
+
+
+/** -------------------------------------------------------
    @brief      Matrix matrix multiplication of a 32-bit integer matrices for RV32IM extension.
    @param[in]  pSrcA points to first the input matrix
    @param[in]  pSrcB points to second the input matrix

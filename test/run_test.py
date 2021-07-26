@@ -28,6 +28,7 @@ __copyright__ = """
 import os
 import sys
 import importlib.util
+import argparse
 
 TEST_FILENAME = "testcase.py"
 
@@ -36,7 +37,7 @@ GREEN_COLOR = "\033[1;32m"
 RESET_COLOR = "\033[0;0m"
 
 
-def test_main(root_folder):
+def test_main(root_folder, platform):
     """ main function """
 
     old_cwd = os.getcwd()
@@ -68,7 +69,7 @@ def test_main(root_folder):
                 os.chdir(root)
 
                 # execute the test
-                _num_total, _num_success = testcase.test()
+                _num_total, _num_success = testcase.test(platform)
 
                 num_total += _num_total
                 num_success += _num_success
@@ -89,8 +90,22 @@ def test_main(root_folder):
 
 
 if __name__ == "__main__":
-    ROOT_FOLDER = "."
-    if len(sys.argv) > 1:
-        ROOT_FOLDER = sys.argv[1]
 
-    test_main(ROOT_FOLDER)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--root_folder', help='root folder')
+    parser.add_argument('-p', '--platform', help='gvsoc or board')
+    args = parser.parse_args()
+
+    print(args.root_folder, args.platform)
+
+    if args.root_folder == None:
+        ROOT_FOLDER = "."
+    else:
+        ROOT_FOLDER = args.root_folder
+
+    if args.platform == None:
+        PLATFORM = "gvsoc"
+    else:
+        PLATFORM = args.platform
+
+    test_main(ROOT_FOLDER, PLATFORM)
