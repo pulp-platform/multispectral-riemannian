@@ -37,7 +37,7 @@
 #ifdef PARALLEL
 
 #ifndef NUM_WORKERS
-#define NUM_WORKERS 8
+#define NUM_WORKERS 9
 #endif//NUM_WORKERS
 
 // struct for the kernel arguments

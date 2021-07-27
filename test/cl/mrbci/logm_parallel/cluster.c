@@ -23,7 +23,9 @@
 #include "../../../../src/cl/mrbci/mrbci.h"
 #include "test_stimuli.h"
 
-#define NUM_WORKERS 8
+#ifndef NUM_WORKERS
+#define NUM_WORKERS 9
+#endif//NUM_WORKERS
 #define _LOGM_WORKSPACE_SIZE (MRBCI_C * (2 * MRBCI_C + 2))
 
 // extern definitions, since those are not exported in mrbci.h
