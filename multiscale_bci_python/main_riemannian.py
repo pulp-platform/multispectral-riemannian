@@ -26,9 +26,9 @@ __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
-QUANTIZED = True
+QUANTIZED = False#True
 RIEM_OPT = "Riemann"
-BANDS = [2] # [2, 4, 8, 16, 32]
+BANDS = [2, 4, 8, 16, 32] # [2] #
 CROSS_VALIDATION = False
 CV_NO_SPLITS = 5
 NO_SUBJECTS = 9
