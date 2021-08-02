@@ -69,6 +69,13 @@ Change self.riem_opt for testing different means:
 $ python main_riemannian.py
 ```
 
+### Export full dataset for complex classifiers
+Running 
+```
+python main_riemannian.py -d -s="-1"
+```
+will generate the file `./export/dataset_full.pkl` of all subjects/patients and samples and both the training and test data. 
+
 ## Authors
 
 * **Michael Hersche** - *Initial work* - [MHersche](https://github.com/MHersche)

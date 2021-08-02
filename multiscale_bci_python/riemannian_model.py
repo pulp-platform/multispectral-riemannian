@@ -294,7 +294,7 @@ class QuantizedRiemannianModel():
         features = self.riemannian.features(samples)
         return self.classifier.predict(features)
 
-    def predict_with_intermediate(self, sample):
+    def predict_with_intermediate(self, sample, verbose=True):
         """ Predict some data
 
         Parameters
@@ -308,7 +308,8 @@ class QuantizedRiemannianModel():
 
         ordered dictionary including every intermediate result and the output
         """
-        print("Predict sample with intermediate matrices")
+        if verbose:
+            print("Predict sample with intermediate matrices")
         assert len(sample.shape) == 2
         result = self.riemannian.onetrial_feature_with_intermediate(sample)
         features = next(reversed(result.values()))

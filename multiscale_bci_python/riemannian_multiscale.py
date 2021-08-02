@@ -18,7 +18,7 @@ __author__ = "Michael Hersche and Tino Rellstab"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 FIXPOINT_IIR_IMPLEMENTATION = True
-COMPUTE_IN_PARALLEL = True
+COMPUTE_IN_PARALLEL = False #True
 
 REF_INVSQRTM_BITS = 11
 COV_MAT_BITS = 16
@@ -150,18 +150,22 @@ class RiemannianMultiscale:
 
         feat = np.zeros((n_trial, self.n_temp, self.n_freq, self.n_riemann))
 
-        if self.use_par:
+        if False: #self.use_par: buggy @cavigelli
             with Pool() as p:
                 cov_mat = np.array(list(tqdm(p.imap(self._par_cov_mat, data),
                                             desc="Compute Covariance matrices", total=n_trial,
                                             leave=False)))
-                feat = np.array(list(tqdm(p.imap(self._par_riemannian, cov_mat),
-                                        desc="Compute Riemannian kernel", total=n_trial,
-                                        leave=False)))
         else:
             cov_mat = np.array(list(tqdm(map(self._par_cov_mat, data),
                                          desc="Compute Covariance matrices", total=n_trial,
                                          leave=False)))
+
+        if self.use_par:
+            with Pool() as p:
+                feat = np.array(list(tqdm(p.imap(self._par_riemannian, cov_mat),
+                                        desc="Compute Riemannian kernel", total=n_trial,
+                                        leave=False)))
+        else:
             feat = np.array(list(tqdm(map(self._par_riemannian, cov_mat),
                                       desc="Compute Riemannian kernel", total=n_trial,
                                       leave=False)))
