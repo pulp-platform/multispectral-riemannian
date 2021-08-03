@@ -23,8 +23,8 @@ from sklearn.model_selection import KFold
 from riemannian_model import RiemannianModel, QuantizedRiemannianModel
 from get_data import get_data
 
-__author__ = "Michael Hersche and Tino Rellstab"
-__email__ = "herschmi@ethz.ch,tinor@ethz.ch"
+__author__ = "Michael Hersche, Tino Rellstab, Lukas Cavigelli"
+__email__ = "herschmi@ethz.ch, tinor@ethz.ch, lukas.cavigelli@huawei.com"
 
 DATA_PATH = "dataset/"
 QUANTIZED = True
