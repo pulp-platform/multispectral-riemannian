@@ -18,12 +18,9 @@ np.random.seed(1234)
 random.seed(12345)
 
 #%% load data
-foldername = './export/'
-with open(os.path.join(foldername, "dataset_full.pkl"), "rb") as _f:
+with open("./export/dataset_full.pkl", "rb") as _f:
     dataset = pickle.load(_f)
 
-# for patient, dataset_train, dataset_test in zip(
-#     dataset['patient'], dataset['dataset_train'], dataset['dataset_test']):
 def get_patient_data(dataset, patient_idx):
     patient = dataset['patient'][patient_idx]
     dataset_train = dataset['dataset_train'][patient_idx]
@@ -38,7 +35,7 @@ def get_patient_data(dataset, patient_idx):
 
 
 # %% random sampling hyper param search
-num_samples = 2
+num_samples = 100
 
 all_modes = [
     '001-baseline', 
@@ -140,7 +137,8 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
         else: 
             svm_c = random.choice(svm_c_all)
 
-        clf = svm.SVC(C=svm_c[0], kernel='linear', random_state=1, tol=0.00001)
+        # clf = svm.SVC(C=svm_c[0], kernel='linear', random_state=1, tol=0.00001)
+        clf = svm.LinearSVC(C=svm_c[0], loss='hinge', random_state=1, tol=0.00001)
 
     elif mode == '901-rbfSVM':
         # RBF SVM
@@ -164,6 +162,9 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
         run_desc = f"{clf.hidden_layer_sizes}"
     elif type(clf) == svm.SVC:
         exp_desc = f"num_samples: {num_samples} -- \n svm -- c: {clf.C}; gamma: {clf.gamma}; kernel: {clf.kernel}; deg: {clf.degree}"
+        run_desc = f"{clf.C}"
+    elif type(clf) == svm.LinearSVC:
+        exp_desc = f"num_samples: {num_samples} -- \n svm -- c: {clf.C}; loss: {clf.loss}; tol: {clf.tol}"
         run_desc = f"{clf.C}"
     elif type(clf) == neighbors.KNeighborsClassifier:
         exp_desc = f"num_samples: {num_samples} -- \n k-NN"
@@ -211,7 +212,7 @@ output.append(f"Avg. Acc.: {avg_scores[best_run_idx]}")
 output.append(f"Std. dev.: {np.array(scores[best_run_idx]).std()}")
 output = '\n'.join(output)
 print(output)
-with open(os.path.join(foldername, f'results-patientAvgAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt'), 'w') as f:
+with open(f'./export/results-patientAvgAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
     f.write(output)
 
 #%% get 'best' run based on patient-specific hparam tuning
@@ -226,7 +227,7 @@ output.append(f"Avg. Acc.: {best_scores.mean()}")
 output.append(f"Std. dev.: {best_scores.std()}")
 output = '\n'.join(output)
 print(output)
-with open(os.path.join(foldername, f'results-patientBestAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt'), 'w') as f:
+with open(f'./export/results-patientBestAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
     f.write(output)
 
 
@@ -236,8 +237,7 @@ data_all = [[
     eval_random(i, mode=mode, num_samples=num_samples) 
     for i in tqdm(range(num_samples), desc='hparams', total=num_samples)] 
     for mode in all_modes]
-# scores, run_descs, exp_descs = zip(*data)
-with open(os.path.join(foldername, f'results-multiClassifier-numSamples_{num_samples}-{time.strftime("%Y%m%d-%H%M%S")}.pkl'), 'wb') as f:
+with open(f'./export/results-multiClassifier-numSamples_{num_samples}-{time.strftime("%Y%m%d-%H%M%S")}.pkl', 'wb') as f:
     pickle.dump((data_all, num_samples, all_modes), f)
 
 #%% analysis of multiple classifier runs (analyze)

@@ -16,7 +16,7 @@ __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
 QUANTIZED = True
-ONLY_2HZ_BANDS = True
+# ONLY_2HZ_BANDS = True
 
 class RiemannianModel():
     """ Riemannian Model """

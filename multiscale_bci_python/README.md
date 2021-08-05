@@ -73,6 +73,7 @@ $ python main_riemannian.py
 Running 
 ```
 python main_riemannian.py -d -s="-1"
+python main_classifier_train_2.py
 ```
 will generate the file `./export/dataset_full.pkl` of all subjects/patients and samples and both the training and test data. 
 
