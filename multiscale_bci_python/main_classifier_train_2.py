@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import append
 from tqdm import tqdm
+import sklearn
+import sklearn.pipeline
+import sklearn.preprocessing
 import sklearn.svm as svm
 import sklearn.tree as tree
 import sklearn.neighbors as neighbors
@@ -41,7 +44,7 @@ all_modes = [
     '001-baseline', 
     '010-sgdAdaptiveLR', '011-actSigmoid', 
     '012-reducedLR', '013-twoHiddenLayers', '014-oneHiddenLayer', 
-    '900-linearSVM', '901-rbfSVM']
+    '900-linearSVM', '901-rbfSVM', '902-scaledLinearSVM']
 
 def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
@@ -153,6 +156,22 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
         clf = svm.SVC(C=svm_c[0], kernel='rbf', random_state=1, tol=0.00001)
 
+    elif mode == '902-scaledLinearSVM':
+        # Linear SVM
+        svm_c_all = list(itertools.product([1e-5,1e-4,1e-3,1e-2,0.1,1.0,10.0,100.0]))
+        if num_samples >= len(svm_c_all):
+            if i < len(svm_c_all):
+                svm_c = svm_c_all[i]
+            else:
+                return return_none
+        else: 
+            svm_c = random.choice(svm_c_all)
+
+        clf = sklearn.pipeline.make_pipeline(
+            sklearn.preprocessing.MinMaxScaler(),
+            svm.LinearSVC(C=svm_c[0], loss='hinge', random_state=1, tol=0.00001)
+            )
+
     else: 
         assert(False) # a valid mode is required
 
@@ -166,6 +185,9 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
     elif type(clf) == svm.LinearSVC:
         exp_desc = f"num_samples: {num_samples} -- \n svm -- c: {clf.C}; loss: {clf.loss}; tol: {clf.tol}"
         run_desc = f"{clf.C}"
+    elif mode == '902-scaledLinearSVM':
+        exp_desc = f"num_samples: {num_samples} -- \n svm -- c: {clf[-1].C}; loss: {clf[-1].loss}; tol: {clf[-1].tol}"
+        run_desc = f"{clf[-1].C}"
     elif type(clf) == neighbors.KNeighborsClassifier:
         exp_desc = f"num_samples: {num_samples} -- \n k-NN"
         run_desc = f"{clf.n_neighbors}"
@@ -195,7 +217,7 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
     return patient_scores, run_desc, exp_desc
 
-data = [eval_random(i, mode='900-linearSVM') for i in tqdm(range(num_samples), desc='hparams', total=num_samples)]
+data = [eval_random(i, mode='902-scaledLinearSVM') for i in tqdm(range(num_samples), desc='hparams', total=num_samples)]
 scores, run_descs, exp_descs = zip(*data)
 
 
@@ -237,12 +259,12 @@ data_all = [[
     eval_random(i, mode=mode, num_samples=num_samples) 
     for i in tqdm(range(num_samples), desc='hparams', total=num_samples)] 
     for mode in all_modes]
-with open(f'./export/results-multiClassifier-numSamples_{num_samples}-{time.strftime("%Y%m%d-%H%M%S")}.pkl', 'wb') as f:
+fname = f'./export/results-multiClassifier-numSamples_{num_samples}-{time.strftime("%Y%m%d-%H%M%S")}.pkl'
+with open(fname, 'wb') as f:
     pickle.dump((data_all, num_samples, all_modes), f)
 
 #%% analysis of multiple classifier runs (analyze)
-# fname = './export/results-multiClassifier-numSamples_2-20210805-022148.pkl'
-fname = './export/results-multiClassifier-numSamples_1000-20210805-043926.pkl'
+fname = './export/results-multiClassifier-numSamples_1000-20210807-204653.pkl'
 with open(fname, 'rb') as f:
     data_all, num_samples, all_modes = pickle.load(f)
 
@@ -277,7 +299,7 @@ print(output)
 
 # best run (accuracy) for patient-specific classifier & hparams
 output = list()
-output.append('--- best model with per-patient tuned hparams ---')
+output.append('--- best model with per-patient tuned hparams and classifier ---')
 best_scores = np.array(scores).max(axis=0)
 best_scores_runidx = np.array(scores).argmax(axis=0)
 for i, rdi in enumerate(best_scores_runidx):
@@ -309,13 +331,6 @@ print(output)
 # plt.savefig(f'save_fig-{timestr}.pdf', bbox_inches='tight')
 
 
-# # %%
-# TODO: what to plot???!!!
-# 1) updated table for various methods
-# 2) best hyper parameter variant
-# 3) best hparam + method variant
-# 4) trade-off parameter count vs. avg. accuracy
-# 5) TURN OFF THE logm quantization!
     #TODO: ideas -- 1) mixing like in EEG-TCnet, 2) try MLP + hinge loss, 3) augmentation?
 
 # %%

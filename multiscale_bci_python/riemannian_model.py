@@ -78,6 +78,7 @@ class RiemannianModel():
         # setup Time Windows
         if time_windows is None:
             time_windows = (np.array([[2.5, 6]]) * fs).astype(int)
+            # time_windows = (np.array([[2.0, 5.0]]) * fs).astype(int)
         else:
             time_windows = (np.array(time_windows) * fs).astype(int)
 
@@ -203,6 +204,7 @@ class QuantizedRiemannianModel():
 
         # setup Time Windows
         time_windows = (np.array([[2.5, 6]]) * fs).astype(int)
+        # time_windows = (np.array([[2.0, 5.0]]) * fs).astype(int) # !!!!!
 
         # setup riemannian
         self.riemannian = QuantizedRiemannianMultiscale(filter_bank, time_windows, riem_opt=riem_opt,

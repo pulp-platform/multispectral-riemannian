@@ -483,7 +483,8 @@ class QuantizedRiemannianMultiscale(RiemannianMultiscale):
         """ Apply the selected filter to the data """
         # measure the input scale or quantize
         if self.monitor_ranges:
-            self.scale_input = max(self.scale_input, np.abs(data).max())
+            safety_factor = 1.0 #1.7 
+            self.scale_input = max(self.scale_input, np.abs(data).max()*safety_factor)
         else:
             # since this is the input, we can apply correct rounding.
             data = self._quantize(data, self.scale_input, do_round=True)

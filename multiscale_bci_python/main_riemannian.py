@@ -159,7 +159,8 @@ def main_dataset_export(subject=-1, foldername='./export'):
 
                 # gather all data
                 history = model.predict_with_intermediate(sample, verbose=False)
-                dataset_patient_test['features_quant'].append(history["features_quant"])
+                # dataset_patient_test['features_quant'].append(history["features_quant"])
+                dataset_patient_test['features_quant'].append(history["features"])
                 dataset_patient_test['label'].append(label)
             return dataset_patient_test
 
