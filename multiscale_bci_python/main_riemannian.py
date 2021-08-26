@@ -27,7 +27,7 @@ __author__ = "Michael Hersche, Tino Rellstab, Lukas Cavigelli"
 __email__ = "herschmi@ethz.ch, tinor@ethz.ch, lukas.cavigelli@huawei.com"
 
 DATA_PATH = "./dataset/"
-QUANTIZED = True
+QUANTIZED = False#True
 RIEM_OPT = "Riemann"
 BANDS = [2] # [2, 4, 8, 16, 32] # 
 RHO = 1
@@ -124,11 +124,15 @@ def main_export(subject, sample_idx, foldername):
 
 def main_dataset_export(subject=-1, foldername='./export'):
     """Exports the full dataset (training and test data) passed through 
-    the quantized Riemannian model for feature extraction for 
+    the (quantized) Riemannian model for feature extraction for 
     separate exploration of classifiers. """
 
-    # we must use the quantized model
-    model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
+    if QUANTIZED:
+        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
+    else:
+        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
+
+
 
     if subject == -1:
         subjects = [i+1 for i in range(NO_SUBJECTS)]
@@ -153,15 +157,19 @@ def main_dataset_export(subject=-1, foldername='./export'):
         # predict the requested sample
         def gen_patient_dataset(samples, labels):
             dataset_patient_test = {'features_quant': list(), 'label': list()}
-            for sample_idx, (sample, label) in tqdm(
-                enumerate(zip(samples, labels)), 
-                desc="forward pass samples", total=len(samples), leave=False):
+                
+            dataset_patient_test['features_quant'] = model.riemannian.features(samples)
+            dataset_patient_test['label'] = labels
 
-                # gather all data
-                history = model.predict_with_intermediate(sample, verbose=False)
-                # dataset_patient_test['features_quant'].append(history["features_quant"])
-                dataset_patient_test['features_quant'].append(history["features"])
-                dataset_patient_test['label'].append(label)
+            # for sample_idx, (sample, label) in tqdm(
+            #     enumerate(zip(samples, labels)), 
+            #     desc="forward pass samples", total=len(samples), leave=False):
+
+            #     # gather all data
+            #     history = model.predict_with_intermediate(sample, verbose=False)
+            #     dataset_patient_test['features_quant'].append(history["features_quant"])
+            #     # dataset_patient_test['features_quant'].append(history["features"])
+            #     dataset_patient_test['label'].append(label)
             return dataset_patient_test
 
         dataset_patient_train = gen_patient_dataset(train_samples, train_labels)

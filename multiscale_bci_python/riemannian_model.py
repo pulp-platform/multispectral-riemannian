@@ -15,7 +15,7 @@ __author__ = "Michael Hersche, Tino Rellstab and Tibor Schneider"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
-QUANTIZED = True
+# QUANTIZED = True
 # ONLY_2HZ_BANDS = True
 
 class RiemannianModel():

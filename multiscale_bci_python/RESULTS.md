@@ -1,4 +1,21 @@
 
+## Reference Results directly with original script
+```
+(msenv2) cavigelli@dev-cav:/scratch/cavigelli/repos/bci-xia/multiscale_bci_python$ python main_riemannian.py
+Test data set
+Subject 1: 0.9074733096085409
+Subject 2: 0.5123674911660777
+Subject 3: 0.8095238095238095
+Subject 4: 0.7412280701754386
+Subject 5: 0.6304347826086957
+Subject 6: 0.5627906976744186
+Subject 7: 0.8592057761732852
+Subject 8: 0.8265682656826568
+Subject 9: 0.8181818181818182
+Average success rate: 0.7408637800883047
+Time elapsed [s] 483.3574357032776
+```
+These results match the paper. 
 
 ## Results With Default/Original Settings
 
@@ -104,10 +121,50 @@ Std. dev.: 13.41%
 Conclusions: 
 1. Lowering the lower frequency of the bandpasss filters from 4Hz to 0.5Hz found helpful in other works does not provide a positive impact (-4% accuracy)
 
-## Results For Varying Bandwidth
+## Best results
+```
+--- best model with per-patient tuned hparams and classifier ---
+Patient 1: 90.75%
+    -- mode: [900-linearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Patient 2: 57.60%
+    -- mode: [011-actSigmoid], exp: [num_samples: 1000 -- 
+solver: adam, lr: constant (init: 0.001), act: logistic], run: [(64, 8, 16)]
+Patient 3: 81.32%
+    -- mode: [902-scaledLinearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Patient 4: 74.12%
+    -- mode: [014-oneHiddenLayer], exp: [num_samples: 1000 -- 
+solver: adam, lr: constant (init: 0.001), act: relu], run: [(128,)]
+Patient 5: 64.13%
+    -- mode: [901-rbfSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 10.0; gamma: scale; kernel: rbf; deg: 3], run: [10.0]
+Patient 6: 56.28%
+    -- mode: [900-linearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Patient 7: 85.92%
+    -- mode: [900-linearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Patient 8: 83.39%
+    -- mode: [001-baseline], exp: [num_samples: 1000 -- 
+solver: adam, lr: adaptive (init: 0.001), act: relu], run: [(128, 8, 128)]
+Patient 9: 81.82%
+    -- mode: [900-linearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Avg. Acc.: 75.04%
+Std. dev.: 12.00%
+```
+Next best options: 
+```
 
 ```
 
+
+
+## Results For Varying Bandwidth
+
+```
+Patient 5:
 ```
 
 
@@ -144,8 +201,40 @@ Std. dev.: 12.46%
 Conclusions: 
 1. Removing the quantization of the feature before classification has no relevant impact (-0.18% accuracy)
 
+## improved export method
+```
+--- best model with shared hparams across patients ---
+desc: mode: [900-linearSVM], exp: [num_samples: 1000 -- 
+ svm -- c: 0.01; loss: hinge; tol: 1e-05], run: [0.01]
+Patient 1: 90.75%
+Patient 2: 51.24%
+Patient 3: 80.95%
+Patient 4: 73.68%
+Patient 5: 63.04%
+Patient 6: 56.28%
+Patient 7: 85.92%
+Patient 8: 82.29%
+Patient 9: 81.82%
+Avg. Acc.: 74.00%
+Std. dev.: 13.14%
+--- best model with per-patient tuned hparams and classifier ---
+Patient 1: 90.75%
+Patient 2: 57.60%
+Patient 3: 81.32%
+Patient 4: 74.12%
+Patient 5: 64.13%
+Patient 6: 56.28%
+Patient 7: 85.92%
+Patient 8: 83.39%
+Patient 9: 81.82%
+Avg. Acc.: 75.04%
+Std. dev.: 12.00%
+```
 
-
+Next best option: 
+```
+Patient 5: 63.77% with 011-actSigmoid (instead of 64.13% with rbfSVM)
+```
 
 
 Open Questions: 

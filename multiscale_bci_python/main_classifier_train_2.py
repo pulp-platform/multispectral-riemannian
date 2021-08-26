@@ -21,7 +21,9 @@ np.random.seed(1234)
 random.seed(12345)
 
 #%% load data
-with open("./export/dataset_full.pkl", "rb") as _f:
+fname_dataset = "./export/dataset_full_v2_full.pkl"
+fname_dataset = "./export/dataset_full_v2_quant.pkl"
+with open(fname_dataset, "rb") as _f:
     dataset = pickle.load(_f)
 
 def get_patient_data(dataset, patient_idx):
@@ -45,12 +47,20 @@ all_modes = [
     '010-sgdAdaptiveLR', '011-actSigmoid', 
     '012-reducedLR', '013-twoHiddenLayers', '014-oneHiddenLayer', 
     '900-linearSVM', '901-rbfSVM', '902-scaledLinearSVM']
+all_modes = [
+    '001-baseline', 
+    '011-actSigmoid', 
+    '014-oneHiddenLayer', 
+    '900-linearSVM', '902-scaledLinearSVM'] # '013-twoHiddenLayers', '012-reducedLR', '010-sgdAdaptiveLR', '901-rbfSVM'
 
-def eval_random(i, mode='001-baseline', num_samples=num_samples):
+def eval_random(i, mode='001-baseline', num_samples=num_samples, patient_idx_list=None):
 
     # mode = '001-baseline'#'901-rbfSVM'#'900-linearSVM'#
 
-    return_none = ([0.0]*9, 'skipped run', 'skipped run')
+    if patient_idx_list == None:
+        patient_idx_list = list(range(9))
+
+    return_none = ([0.0]*len(patient_idx_list), 'skipped run', 'skipped run', None)
 
     # n1 = np.random.choice([4,8,16,32,64,128])
     # n2 = np.random.choice([4,8,16,32,64,128])
@@ -131,7 +141,8 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
     elif mode == '900-linearSVM':
         # Linear SVM
-        svm_c_all = list(itertools.product([1e-5,1e-4,1e-3,1e-2,0.1,1.0,10.0,100.0]))
+        # svm_c_all = list(itertools.product([1e-5,1e-4,1e-3,1e-2,0.1,1.0,10.0,100.0]))
+        svm_c_all = list(itertools.product([0.1]))
         if num_samples >= len(svm_c_all):
             if i < len(svm_c_all):
                 svm_c = svm_c_all[i]
@@ -158,7 +169,8 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
     elif mode == '902-scaledLinearSVM':
         # Linear SVM
-        svm_c_all = list(itertools.product([1e-5,1e-4,1e-3,1e-2,0.1,1.0,10.0,100.0]))
+        # svm_c_all = list(itertools.product([1e-5,1e-4,1e-3,1e-2,0.1,1.0,10.0,100.0]))
+        svm_c_all = list(itertools.product([0.1]))
         if num_samples >= len(svm_c_all):
             if i < len(svm_c_all):
                 svm_c = svm_c_all[i]
@@ -209,54 +221,66 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples):
 
 
     patient_scores = list()
-    for patient_idx in range(9): #for all patients
+    patient_models = list()
+    for patient_idx in patient_idx_list: #for all patients
         patient, data_train, labels_train, data_test, labels_test = get_patient_data(dataset, patient_idx)
         clf.fit(data_train, labels_train)
         score = clf.score(data_test, labels_test)
         patient_scores.append(score)
+        patient_models.append(clf)
 
-    return patient_scores, run_desc, exp_desc
+    # return_models = True
+    # if return_models:
+    return patient_scores, run_desc, exp_desc, patient_models
+    # else:
+        # return patient_scores, run_desc, exp_desc
 
-data = [eval_random(i, mode='902-scaledLinearSVM') for i in tqdm(range(num_samples), desc='hparams', total=num_samples)]
-scores, run_descs, exp_descs = zip(*data)
+data = [eval_random(i, mode='900-linearSVM') for i in tqdm(range(num_samples), desc='hparams', total=num_samples)]
+scores, run_descs, exp_descs, models = zip(*data)
 
 
-#%% get 'best' run based on patient-average accuracy
-avg_scores = np.array(scores).mean(axis=1)
-best_run_idx = avg_scores.argmax()
-output = list()
-output.append('--- best model with shared hparams across patients ---')
-output.append('exp. params: ' + exp_descs[0])
-output.append('hparams: ' + run_descs[best_run_idx])
-for i, s in enumerate(scores[best_run_idx]):
-    output.append(f"Patient {i+1}: {s}")
-output.append(f"Avg. Acc.: {avg_scores[best_run_idx]}")
-output.append(f"Std. dev.: {np.array(scores[best_run_idx]).std()}")
-output = '\n'.join(output)
-print(output)
-with open(f'./export/results-patientAvgAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
-    f.write(output)
+# #%% get 'best' run based on patient-average accuracy
+# avg_scores = np.array(scores).mean(axis=1)
+# best_run_idx = avg_scores.argmax()
+# output = list()
+# output.append('--- best model with shared hparams across patients ---')
+# output.append('exp. params: ' + exp_descs[0])
+# output.append('hparams: ' + run_descs[best_run_idx])
+# for i, s in enumerate(scores[best_run_idx]):
+#     output.append(f"Patient {i+1}: {s}")
+# output.append(f"Avg. Acc.: {avg_scores[best_run_idx]}")
+# output.append(f"Std. dev.: {np.array(scores[best_run_idx]).std()}")
+# output = '\n'.join(output)
+# print(output)
+# with open(f'./export/results-patientAvgAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
+#     f.write(output)
 
-#%% get 'best' run based on patient-specific hparam tuning
-output = list()
-output.append('--- best model with per-patient tuned hparams ---')
-output.append('exp. params: ' + exp_descs[0].replace('\n', ' '))
-best_scores = np.array(scores).max(axis=0)
-best_scores_runidx = np.array(scores).argmax(axis=0)
-for i, (s, rdi) in enumerate(zip(scores[best_run_idx], best_scores_runidx)): # BUG: best_run_idx not set?!
-    output.append(f"Patient {i+1}: {s} -- {run_descs[rdi]}")
-output.append(f"Avg. Acc.: {best_scores.mean()}")
-output.append(f"Std. dev.: {best_scores.std()}")
-output = '\n'.join(output)
-print(output)
-with open(f'./export/results-patientBestAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
-    f.write(output)
+# #%% get 'best' run based on patient-specific hparam tuning
+# output = list()
+# output.append('--- best model with per-patient tuned hparams ---')
+# output.append('exp. params: ' + exp_descs[0].replace('\n', ' '))
+# best_scores = np.array(scores).max(axis=0)
+# best_scores_runidx = np.array(scores).argmax(axis=0)
+# for i, (s, rdi) in enumerate(zip(scores[best_run_idx], best_scores_runidx)): # BUG: best_run_idx not set?!
+#     output.append(f"Patient {i+1}: {s} -- {run_descs[rdi]}")
+# output.append(f"Avg. Acc.: {best_scores.mean()}")
+# output.append(f"Std. dev.: {best_scores.std()}")
+# output = '\n'.join(output)
+# print(output)
+# with open(f'./export/results-patientBestAcc-{time.strftime("%Y%m%d-%H%M%S")}.txt', 'w') as f:
+#     f.write(output)
 
 
 #%% multiple classifier runs (execute)
 num_samples = 1000
+patient_idx_list = list(range(9))
+# patient_idx_list = [1, 2]
+
 data_all = [[
-    eval_random(i, mode=mode, num_samples=num_samples) 
+    eval_random(
+        i, mode=mode, 
+        num_samples=num_samples, 
+        patient_idx_list=patient_idx_list) 
     for i in tqdm(range(num_samples), desc='hparams', total=num_samples)] 
     for mode in all_modes]
 fname = f'./export/results-multiClassifier-numSamples_{num_samples}-{time.strftime("%Y%m%d-%H%M%S")}.pkl'
@@ -264,9 +288,17 @@ with open(fname, 'wb') as f:
     pickle.dump((data_all, num_samples, all_modes), f)
 
 #%% analysis of multiple classifier runs (analyze)
-fname = './export/results-multiClassifier-numSamples_1000-20210807-204653.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210825-051413.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210825-142442.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210825-153024.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210826-014226.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210826-022023.pkl'
+# fname = './export/results-multiClassifier-numSamples_1000-20210826-044702.pkl' # full precision
+fname = './export/results-multiClassifier-numSamples_1000-20210826-044755.pkl' # quantized
 with open(fname, 'rb') as f:
-    data_all, num_samples, all_modes = pickle.load(f)
+    file_complete = pickle.load(f)
+# data_all, num_samples, all_modes, all_models = file_complete
+data_all, num_samples, all_modes = file_complete
 
 # all data
 # data_all_fused = [
@@ -278,11 +310,12 @@ sel_modes = all_modes
 # sel_modes = ['900-linearSVM']
 # sel_modes = ['001-baseline']
 data_all_fused = [
-    (patient_scores, f"mode: [{sel_mode}], exp: [{exp_desc}], run: [{run_desc}]") 
+    (patient_scores, f"mode: [{sel_mode}], exp: [{exp_desc}], run: [{run_desc}]", patient_models) 
     for sel_mode in sel_modes
-    for patient_scores, run_desc, exp_desc in data_all[all_modes.index(sel_mode)]
+    for patient_scores, run_desc, exp_desc, patient_models in data_all[all_modes.index(sel_mode)]
+    # for patient_scores, run_desc, exp_desc in data_all[all_modes.index(sel_mode)]
    ]
-scores, descs = zip(*data_all_fused)
+scores, descs, models = zip(*data_all_fused)
 
 # best run based on patient-average accuracy
 avg_scores = np.array(scores).mean(axis=1)
@@ -302,14 +335,25 @@ output = list()
 output.append('--- best model with per-patient tuned hparams and classifier ---')
 best_scores = np.array(scores).max(axis=0)
 best_scores_runidx = np.array(scores).argmax(axis=0)
+selected_models = [models[rdi][i] for i, rdi in enumerate(best_scores_runidx)]
 for i, rdi in enumerate(best_scores_runidx):
     output.append(f"Patient {i+1}: {scores[rdi][i]*100:.2f}%")
-    # output.append(f"    -- {descs[rdi]}")
+    output.append(f" -- {descs[rdi]}")
+    m = selected_models[i]
+    if type(m) == svm.LinearSVC:
+        nparams = m.coef_.size
+    elif type(m) == nn.MLPClassifier:
+        nparams = np.array([c.size for c in m.coefs_]).sum()
+    else:
+        nparams = "unknown classifier"
+    output.append(f" -- model: {m}")
+    output.append(f" -- params: {nparams}")
 output.append(f"Avg. Acc.: {best_scores.mean()*100:.2f}%")
 output.append(f"Std. dev.: {best_scores.std()*100:.2f}%")
 output = '\n'.join(output)
 print(output)
-
+with open(f'./export/results-patientBestAcc-TEMP2.txt', 'w') as f:
+    f.write(output)
 
 
 #%% plot hparam search results
@@ -331,6 +375,6 @@ print(output)
 # plt.savefig(f'save_fig-{timestr}.pdf', bbox_inches='tight')
 
 
-    #TODO: ideas -- 1) mixing like in EEG-TCnet, 2) try MLP + hinge loss, 3) augmentation?
+#TODO: ideas -- 1) mixing like in EEG-TCnet, 2) try MLP + hinge loss, 3) augmentation?
 
 # %%
