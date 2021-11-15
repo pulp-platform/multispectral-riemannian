@@ -245,6 +245,6 @@ Open Questions:
 5. ??
 6. 
 
-Analyzses for the paper: 
+Analyses for the paper: 
 1. Include the above findings in text
 2. expand table with optimal hparam + method variant

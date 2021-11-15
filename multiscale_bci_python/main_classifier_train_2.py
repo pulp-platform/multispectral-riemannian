@@ -67,7 +67,7 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples, patient_idx_lis
     # n3 = np.random.choice([4,8,16,32,64,128])
     # hidden_sizes = (n1, n2, n3)
     # default hparam selector
-    hidden_sizes_all = list(itertools.product([4,8,16,32,64,128], [4,8,16,32,64,128], [4,8,16,32,64,128]))
+    hidden_sizes_all = list(itertools.product([4,8,16,32,64,128,256], [4,8,16,32,64,128,256], [4,8,16,32,64,128,256]))
     if num_samples >= len(hidden_sizes_all):
         if i < len(hidden_sizes_all):
             hidden_sizes = hidden_sizes_all[i]
@@ -107,7 +107,7 @@ def eval_random(i, mode='001-baseline', num_samples=num_samples, patient_idx_lis
 
     elif mode == '013-twoHiddenLayers':
         # Two hidden layers?
-        hidden_sizes_all = list(itertools.product([4,8,16,32,64,128], [4,8,16,32,64,128]))
+        hidden_sizes_all = list(itertools.product([4,8,16,32,64,128,256], [4,8,16,32,64,128,256]))
         if num_samples >= len(hidden_sizes_all):
             if i < len(hidden_sizes_all):
                 hidden_sizes = hidden_sizes_all[i]
@@ -274,7 +274,7 @@ scores, run_descs, exp_descs, models = zip(*data)
 #%% multiple classifier runs (execute)
 num_samples = 1000
 patient_idx_list = list(range(9))
-# patient_idx_list = [1, 2]
+patient_idx_list = [3, 7]
 
 data_all = [[
     eval_random(
@@ -354,6 +354,194 @@ output = '\n'.join(output)
 print(output)
 with open(f'./export/results-patientBestAcc-TEMP2.txt', 'w') as f:
     f.write(output)
+
+
+
+#%% accuracy vs. #params plot
+
+def get_params(m):
+    if m == None:
+        nparams = 1e12
+    elif type(m) == svm.LinearSVC:
+        nparams = m.coef_.size
+    elif type(m) == nn.MLPClassifier:
+        nparams = np.array([c.size for c in m.coefs_]).sum()
+    else:
+        nparams = -1#"unknown classifier"
+    return nparams
+def fix_none(sm):
+    if sm == None:
+        return [None]*9
+    else: 
+        return sm
+scores_all = np.array(scores) # method x subject
+params_all = np.array([[get_params(m) for m in fix_none(subj_models)] for subj_models in models])
+
+params_unique = np.unique(params_all)
+params_unique = params_unique[params_unique <= 2e6]
+def get_metric_by_paramConstr(max_params):
+    constr_scores = scores_all * (params_all <= max_params)
+    constr_scores_best = constr_scores.max(axis=0)
+    accuracy_avg = constr_scores_best.mean()
+    accuracy_std = constr_scores_best.std()
+    return accuracy_avg, accuracy_std
+
+acc_avg, acc_std = zip(*[get_metric_by_paramConstr(max_params) for max_params in params_unique])
+
+plt.plot(params_unique[:-1], np.array(acc_avg[:-1])*100)
+plt.xlabel('#params')
+plt.ylabel('accuracy [%]')
+plt.grid(True)
+plt.show()
+
+#%% accuracy vs. #params plot -- COMPLETE
+
+
+maccs = [130,130, 630, 1040, 2020, 68, 0]#, 964, 17300] # in 0.1M
+
+parameters = [2548/4,2548, 47300, 261000, 155000, 4270, 4554/2]#, 240000,#7780000] in 8 bits B
+
+fmaps = [65.602/4, 225, 1013, 50, 5775, 396, 38.544/4+4.554+4.554]#, 499, 525] # in 8 bits kB
+
+kb32 = [x * 4/1000 for x in parameters]
+fmaps32 = [x * 4 for x in fmaps]
+memfoot = [x+y for x, y in zip(kb32, fmaps32)]
+
+accuracies = [70.9, 71.2, 74.31, 73.70, 75.80, 77.34, 74.1]#, 81.1, 88.87]
+
+networks = ['Q-EEGNet','EEGNet', 'S.ConvNet', 'FBCSP', 'MSFBCNN', 'EEG-TCNet', 'MRC-Mr.Wolf']#, 'CNN++', 'TPCT']
+
+#new = [x/1000000 for x in maccs]
+#newlist = [x/100000 for x in maccs]
+textObjs = []
+avoidObjs = []
+fig = plt.figure(num=None, figsize=(8, 6), dpi=800, facecolor='w', edgecolor='k')
+ax = fig.add_subplot(111)
+
+for numParam,acc1,ar,name in zip(memfoot, accuracies,maccs,networks):
+    x = numParam
+    y = acc1
+    s = ar
+    if(name == 'Variable EEG-TCNet'):
+        txtobj = ax.text(x, 84, name, weight='bold',fontsize = 10, horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='#32FF32',hatch='////')
+        ax.scatter(x,y,c='k',s=2)
+    elif(name == 'EEG-TCNet'):
+        txtobj = ax.text(x, y-1, name, fontsize = 10, horizontalalignment='center') #weight='bold',
+        sctobj = ax.scatter(x, y, s=ar,c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'Variable EEGNet'):
+        txtobj = ax.text(x-4400, 81, name, fontsize = 10)
+        sctobj = ax.scatter(x, y, s=ar,c='#000096',ec='white',hatch='////')
+        ax.scatter(x,y,c='k',s=2)
+    elif(name == 'EEGNet'):
+        txtobj = ax.text(x, y-1, name, fontsize = 10,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'Q-EEGNet'):
+        txtobj = ax.text(x, y-1, name, fontsize = 10,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'TPCT'):
+        txtobj = ax.text(x, 80.2, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='#800000')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'MSFBCNN'):
+        txtobj = ax.text(x, y-1, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'CNN++'):
+        txtobj = ax.text(x, 83, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,c='#BA55D3')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'DFFN'):
+        txtobj = ax.text(x, 82, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar,ec='white',hatch='////')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'S.ConvNet'):
+        txtobj = ax.text(x, y-1, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar, c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'MRC-Mr.Wolf'):
+        txtobj = ax.text(x, y-1, name,horizontalalignment='center', c='#008f1f')
+        sctobj = ax.scatter(x, y, s=1000000/10000,marker = 's', c='#008f1f') #c='tab:red')
+        ax.scatter(x,y,c='silver',s=2)
+    elif(name == 'FBCSP'):
+        txtobj = ax.text(x, y-1, name,horizontalalignment='center')
+        sctobj = ax.scatter(x, y, s=ar, c='tab:red')
+        ax.scatter(x,y,c='silver',s=7)
+#     elif(name == 'FB-3D-CNN'):
+#         txtobj = ax.text(x, y-1, name,horizontalalignment='center')
+#         sctobj = ax.scatter(x, y, s=ar, c='tab:green')
+#         ax.scatter(x,y,c='silver',s=2)
+    textObjs.append(txtobj)
+    avoidObjs.append(sctobj)
+    
+xmax = 50*10**4
+xmin = 10
+ymax = 80
+ymin = 64
+L1mem = 64
+L2mem = 512
+L1memvega = 128
+L2memvega = 1500
+
+plt.vlines(L1mem, ymin,ymax, colors='grey', ls='dashed')
+#ax.text(L1mem+L1mem*0.1, ymin+0.5, '64kB')
+ax.text(L1mem, ymax+0.2, '64kB', fontsize = 10, horizontalalignment='center')
+plt.vlines(L2mem, ymin,ymax, colors='grey', ls='dashed')
+#ax.text(L2mem+L2mem*0.1, ymin+0.5, '512kB')
+ax.text(L2mem, ymax+0.2, '512kB', fontsize = 10, horizontalalignment='center')
+
+plt.vlines(L1memvega, ymin,ymax, colors='grey', ls='-.')
+#ax.text(L1mem+L1mem*0.1, ymin+0.5, '64kB')
+ax.text(L1memvega, ymax+0.2, '128kB', fontsize = 10, horizontalalignment='center')
+plt.vlines(L2memvega, ymin,ymax, colors='grey', ls='-.')
+#ax.text(L2mem+L2mem*0.1, ymin+0.5, '512kB')
+ax.text(L2memvega, ymax+0.2, '1500kB', fontsize = 10, horizontalalignment='center')
+
+ax.set_xscale('log')
+ax.set_xlabel('Memory footprint [kB]', fontsize=14)
+ax.set_ylabel('Accuracy [%]', fontsize=14)
+#ax.spines['top'].set_visible(False)
+#ax.spines['right'].set_visible(False)
+plt.grid(True,ls='--')
+plt.xlim(xmin,xmax)
+plt.ylim(ymin,ymax)
+
+#Show blob sizes:
+x_blobs = [10**4,2*10**4,5*10**4,2*10**5]#,1.3*10**7]
+y_blobs = [66 for i in x_blobs]
+y_blobs_text = [66.5,66.8,67.2,67.8]#,72]
+s_blobs = [100,200,500,2000]#,10000]
+names_blobs = ['10M','20M','50M','200M']#,'1000M']
+ax.scatter(x_blobs,y_blobs,s=s_blobs,c='0.9')
+for x_b,y_b,n in zip(x_blobs,y_blobs_text,names_blobs):
+    ax.text(x_b,y_b,n, fontsize=9,horizontalalignment='center',style='italic')
+#adjust_text(textObjs, add_objects=avoidObjs#, 
+            #arrowprops=dict(arrowstyle="->", color='black')
+#            )
+
+# plt.plot(-1, -1, marker='o', linestyle="None", mfc='tab:green', markeredgecolor='tab:green', label='2-class')
+# plt.plot(-1, -1, marker='o', linestyle="None", mfc='tab:blue', markeredgecolor='tab:blue', label='3-class')
+# plt.plot(-1, -1, marker='o', linestyle="None", mfc='tab:red', markeredgecolor='tab:red', label='4-class')
+# plt.legend(loc='lower center', ncol=3)
+
+memory_req = np.array(params_unique[:-1]) + (2*22*876+18*(22+1)*22/2*4+18*(22+1)*22/2*2)
+accuracy = np.array(acc_avg[:-1])
+# memory_req = np.insert(memory_req, 0, 123)
+plt.plot(memory_req/1000, accuracy*100)
+ax.text(280, 75, 'MRC Vega', horizontalalignment='center', color='#1f77b4')
+
+
+plt.tight_layout()
+#plt.savefig('figures/accuracy_vs_parameters_without_arrows_without_colorbar.eps', format='eps')
+#plt.savefig('figures/see_text.eps', format='eps')
+# plt.savefig('./acc_vs_memory.svg', format='svg')
+plt.savefig('./export/acc_vs_memory.pdf')
+#tikzplotlib.save("acc_vs_memory_wo_cs.tex")
+plt.show()
+
 
 
 #%% plot hparam search results
