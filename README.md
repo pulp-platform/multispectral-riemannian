@@ -1,12 +1,14 @@
-Copyright (C) 2020 ETH Zurich, Switzerland. Refer to paragraph `License and Attribution` below for information on the license.
+Copyright (C) 2021 ETH Zurich, Switzerland. Refer to paragraph `License and Attribution` below for information on the license.
 
-# multiscale-bci-wolf
+# Multiscale Riemannian Classifier on Vega
 
-Implementation of the quantized Multiscale Riemannian Classifier on Mr Wolf.
+This repository contains the creation of subject-specific multiscale Riemannian classifiers (MRCs), in `multiscale_bci_python`, and the implementation of the quantized MRC on PULP-based Vega.
 
-This project was developed by Tibor Schneider during his Semester thesis at ETH Zurich under the supervision of Xiaying Wang, Michael Hersche, and Lukas Cavigelli.
+For more details, please read the paper *Sub-100uW Multispectral Riemannian Classification for EEG-based Brain??Machine Interfaces*, accepted for publication at TBioCAS journal. It will be soon available on IEEE Xplore.
 
-For more details, please read the paper *Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain--Machine Interfaces* available on [IEEE Xplore](https://ieeexplore.ieee.org/document/9401564) and on [arXiv](https://arxiv.org/abs/2102.11221). If you find this work useful in your research, please cite
+This project is an extension of the paper *Mixed-Precision Quantization and Parallel Implementation of Multispectral Riemannian Classification for Brain--Machine Interfaces*, published at ISCAS 2021, available on [IEEE Xplore](https://ieeexplore.ieee.org/document/9401564) and on [arXiv](https://arxiv.org/abs/2102.11221), develped by Tibor Schneider at ETH Zurich under the supervision of Xiaying Wang, Michael Hersche, and Lukas Cavigelli. For this version, please refer to tag `mrwolf-iscas`.
+
+If you find this work useful in your research, please cite
 ```
 @INPROCEEDINGS{9401564,
 author={Wang, Xiaying and Schneider, Tibor and Hersche, Michael and Cavigelli, Lukas and Benini, Luca},
@@ -30,6 +32,8 @@ doi={10.1109/ISCAS51556.2021.9401564}
 ```
 python3.8 -e pip install numpy scipy sklearn pyriemann matplotlib tqdm cffi
 ```
+
+Please refer to `mrc_env.yml` file for complete and updated requirements.
 
 # Setup
 
