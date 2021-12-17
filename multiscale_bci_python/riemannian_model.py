@@ -15,8 +15,8 @@ __author__ = "Michael Hersche, Tino Rellstab and Tibor Schneider"
 __email__ = "herschmi@ethz.ch,tinor@ethz.ch"
 
 DATA_PATH = "dataset/"
-QUANTIZED = True
-ONLY_2HZ_BANDS = True
+# QUANTIZED = True
+# ONLY_2HZ_BANDS = True
 
 class RiemannianModel():
     """ Riemannian Model """
@@ -78,6 +78,7 @@ class RiemannianModel():
         # setup Time Windows
         if time_windows is None:
             time_windows = (np.array([[2.5, 6]]) * fs).astype(int)
+            # time_windows = (np.array([[2.0, 5.0]]) * fs).astype(int)
         else:
             time_windows = (np.array(time_windows) * fs).astype(int)
 
@@ -203,6 +204,7 @@ class QuantizedRiemannianModel():
 
         # setup Time Windows
         time_windows = (np.array([[2.5, 6]]) * fs).astype(int)
+        # time_windows = (np.array([[2.0, 5.0]]) * fs).astype(int) # !!!!!
 
         # setup riemannian
         self.riemannian = QuantizedRiemannianMultiscale(filter_bank, time_windows, riem_opt=riem_opt,
@@ -294,7 +296,7 @@ class QuantizedRiemannianModel():
         features = self.riemannian.features(samples)
         return self.classifier.predict(features)
 
-    def predict_with_intermediate(self, sample):
+    def predict_with_intermediate(self, sample, verbose=True):
         """ Predict some data
 
         Parameters
@@ -308,7 +310,8 @@ class QuantizedRiemannianModel():
 
         ordered dictionary including every intermediate result and the output
         """
-        print("Predict sample with intermediate matrices")
+        if verbose:
+            print("Predict sample with intermediate matrices")
         assert len(sample.shape) == 2
         result = self.riemannian.onetrial_feature_with_intermediate(sample)
         features = next(reversed(result.values()))
