@@ -19,7 +19,7 @@ DATA_FILENAME = "../../../data/verification.pkl"
 
 TOLERANCE = 3
 
-def test():
+def test(platform):
     """
     Execute the tests
     Returns: (n_total, n_success)

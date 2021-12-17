@@ -1,0 +1,20 @@
+if error like this:
+
+**** Test Case: cl::mrbci::covmat
+freq 15...................................OK [cycles: 167954, insn: 167105, ipc: 0.995]
+freq 12...................................OK [cycles: 167954, insn: 167105, ipc: 0.995]
+freq 02...................................OK [cycles: 167954, insn: 167105, ipc: 0.995]
+freq 16...................................OK [cycles: 167954, insn: 167105, ipc: 0.995]
+Traceback (most recent call last):
+  File "run_test.py", line 111, in <module>
+    test_main(ROOT_FOLDER, PLATFORM)
+  File "run_test.py", line 72, in test_main
+    _num_total, _num_success = testcase.test(platform)
+  File "/home/vega/Documents/mrc/vega-mrc/test/cl/mrbci/covmat/testcase.py", line 102, in test
+    X, Y, _ = gen_stimuli(freq_idx)
+  File "/home/vega/Documents/mrc/vega-mrc/test/cl/mrbci/covmat/testcase.py", line 62, in gen_stimuli
+    assert np.all(block(X) == Y)
+AssertionError
+
+
+rm the build folders

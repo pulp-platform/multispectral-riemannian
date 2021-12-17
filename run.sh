@@ -22,10 +22,12 @@ PLATFORM="gvsoc"
 RUN=true
 GTKWAVE=false
 TRAIN=false
+CHIP="wolfe"
 
-while getopts "bp:nwtfde:h" name; do
+while getopts "bvp:nwtfde:h" name; do
     case "$name" in
         b) PLATFORM="board";;
+        v) CHIP="vega";;
         p) PLATFORM=$OPTARG;;
         n) RUN=false;;
         w) GTKWAVE=true;;
@@ -33,6 +35,7 @@ while getopts "bp:nwtfde:h" name; do
         h) printf "Usage: %s [-b] [-p platform] [-h] [-n] [-w]\n" $0
            printf " -b            build on the board, equivalent to -p board\n"
            printf " -p <platform> build on the desired platform [board | gvsoc], default is gvsoc\n"
+           printf " -v            use vega instead of mr. wolf\n"
            printf " -n            do not run the program, just build it\n"
            printf " -w            generate GTK wave files\n"
            printf " -h            show this help message\n"
@@ -64,7 +67,7 @@ if [ "$TRAIN" = true ]; then
     cd ..
 fi
 
-printf "Running EEGnet on Platform: %s\n\n" $PLATFORM
+printf "Running MRC on Platform: %s\n\n" $PLATFORM
 
 # set the platform
 PULP_CURRENT_CONFIG_ARGS="platform=$PLATFORM"
@@ -95,13 +98,21 @@ cd ..
 # deactivate
 
 # build everything
-make clean all
+if [ "$CHIP" = "vega" ] ; then
+    make clean all PMSIS_OS=pulp-os platform=gvsoc
+else
+    make clean all
+fi
 
 # run if requested
 if [ "$GTKWAVE" = true ] ; then
     make run runner_args="--vcd --event=.*"
 else
     if [ "$RUN" = true ] ; then
-        make run
+        if [ "$CHIP" = "vega" ] ; then
+            make run platform=gvsoc
+        else
+            make run
+        fi
     fi
 fi

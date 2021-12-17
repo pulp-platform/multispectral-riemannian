@@ -1,11 +1,9 @@
 PULP_APP = mrbci
 
 PULP_APP_FC_SRCS = \
-    src/fc/main.c
-
-PULP_APP_CL_SRCS = \
+    src/fc/main.c\
     src/cl/cluster.c \
-	src/cl/input.c \
+    src/cl/input.c \
 	src/cl/func/convert.c \
 	src/cl/func/copy_mat.c \
 	src/cl/func/covmat.c \
@@ -24,10 +22,26 @@ PULP_APP_CL_SRCS = \
 	src/cl/mrbci/mrbci_params.c \
 	src/cl/mrbci/svm.c \
 	src/cl/mrbci/whitening.c \
+    dsp/plp_mat_mult_i32.c \
+    dsp/plp_mat_mult_i32_parallel.c \
+    dsp/plp_mat_mult_i16.c \
+    dsp/plp_mat_mult_i16_parallel.c \
+    dsp/kernels/plp_mat_mult_i32s_rv32im.c \
+    dsp/kernels/plp_mat_mult_i32s_xpulpv2.c \
+    dsp/kernels/plp_mat_mult_i32p_xpulpv2.c \
+    dsp/kernels/plp_mat_mult_i16p_xpulpv2.c \
+    dsp/kernels/plp_mat_mult_i16s_rv32im.c \
+    dsp/kernels/plp_mat_mult_i16s_xpulpv2.c
+
 
 PULP_CFLAGS = -O3 -g
 
-PULP_LDFLAGS += -lplpdsp -lm
+# the vega sdk is not stable yet, so I can't compile the pulp-dsp library and install in it, besides the library has to be readapted for vega. Hence, I copied the needed functions from pulp-dsp library to folder dsp
+IDIR=$(CURDIR)/dsp
+PULP_CFLAGS += -I$(IDIR)
+
+#PULP_LDFLAGS += -lplpdsp -lm
+PULP_LDFLAGS += -lm
 
 # enable slow householder
 # PULP_CFLAGS += -DHOUSEHOLDER_SLOW
@@ -45,4 +59,4 @@ PULP_CFLAGS += -DUSE_FUSED_FPU
 # do Power Measurement
 # PULP_CFLAGS += "-DPOWER"
 
-include $(PULP_SDK_HOME)/install/rules/pulp_rt.mk
+include $(GAP_SDK_HOME)/tools/rules/pulp_rules.mk

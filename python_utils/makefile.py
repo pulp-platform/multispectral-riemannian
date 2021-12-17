@@ -34,7 +34,7 @@ FILES_IN_ROOT = {'data', 'src', 'README.md', 'test', 'Makefile', 'python_utils',
 
 class Makefile:
     """ Makefile generation """
-    def __init__(self, project_root=None, use_dsp=True, use_fma=None, use_sqrtdiv=None):
+    def __init__(self, project_root=None, use_dsp=True, use_fma=None, use_sqrtdiv=None, use_vega=False):
         self.fc_sources = []
         self.cl_sources = []
         self.defines = []
@@ -61,13 +61,20 @@ class Makefile:
         if self.use_sqrtdiv is None:
             self.use_sqrtdiv = os.environ["WOLFTEST_USE_SQRTDIV"] == "true"
 
+        self.use_vega=use_vega
+        if self.use_vega:
+            self.use_dsp=False
+
     def add_fc_test_source(self, name):
         """ add test source file, located in current directory """
         self.fc_sources.append(name)
 
     def add_cl_test_source(self, name):
         """ add test source file, located in current directory """
-        self.cl_sources.append(name)
+        if self.use_vega:
+            self.fc_sources.append(name)
+        else:
+            self.cl_sources.append(name)
 
     def add_fc_prog_source(self, name):
         """ add source file from the actual program, starting at root/src/fc/ """
@@ -81,7 +88,10 @@ class Makefile:
         source_file = os.path.join(self.project_root, "src/cl", name)
         assert os.path.exists(source_file), "Could not find CL source file: {}".format(source_file)
         assert source_file.endswith(".c")
-        self.cl_sources.append(source_file)
+        if self.use_vega:
+            self.fc_sources.append(source_file)
+        else:
+            self.cl_sources.append(source_file)
 
     def add_define(self, name, value=None):
         """ Those defines will be passed to gcc with -Dname=value flag """
@@ -112,6 +122,11 @@ class Makefile:
             ret += "PULP_LDFLAGS += -lplpdsp\n"
 
         ret += "PULP_CFLAGS = -O3 -g \n\n"
+
+        if self.use_vega:
+            ret += "IDIR="+self.project_root+"/dsp\nPULP_CFLAGS += -I$(IDIR)\n"
+            ret += "LIB=$(IDIR)/libplpdsp.a\n"
+            ret += "PULP_LDFLAGS += $(LIB)\n\n"
         # link math library
         ret += "PULP_LDFLAGS += -lm\n\n"
 
@@ -131,7 +146,10 @@ class Makefile:
         ret += "\n\n"
 
         # include the pulp sdk
-        ret += "include $(PULP_SDK_HOME)/install/rules/pulp_rt.mk\n"
+        if self.use_vega:
+            ret += "include $(GAP_SDK_HOME)/tools/rules/pulp_rules.mk\n"
+        else:
+            ret += "include $(PULP_SDK_HOME)/install/rules/pulp_rt.mk\n"
         return ret
 
     def write(self):

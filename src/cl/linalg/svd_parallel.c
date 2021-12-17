@@ -38,7 +38,7 @@
 #define _MIN_ALLOWED_EIGENVALUE 1.e-3f
 
 #ifndef NUM_WORKERS
-#define NUM_WORKERS 8
+#define NUM_WORKERS 9
 #endif//NUM_WORKERS
 
 static RT_L1_DATA linalg_evd_2x2_t _g_evd;

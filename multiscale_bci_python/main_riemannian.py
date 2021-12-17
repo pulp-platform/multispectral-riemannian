@@ -16,24 +16,25 @@ import pickle
 import numpy as np
 import argparse
 
+from tqdm import tqdm
 from sklearn.model_selection import KFold
 
 # import self defined functions
 from riemannian_model import RiemannianModel, QuantizedRiemannianModel
 from get_data import get_data
 
-__author__ = "Michael Hersche and Tino Rellstab"
-__email__ = "herschmi@ethz.ch,tinor@ethz.ch"
+__author__ = "Michael Hersche, Tino Rellstab, Lukas Cavigelli"
+__email__ = "herschmi@ethz.ch, tinor@ethz.ch, lukas.cavigelli@huawei.com"
 
-DATA_PATH = "dataset/"
-QUANTIZED = True
+DATA_PATH = "./dataset/"
+QUANTIZED = False#True
 RIEM_OPT = "Riemann"
-BANDS = [2] # [2, 4, 8, 16, 32]
+BANDS = [2] # [2, 4, 8, 16, 32] # 
+RHO = 1
 CROSS_VALIDATION = False
 CV_NO_SPLITS = 5
 NO_SUBJECTS = 9
 RANDOM_SEED = 1 # None
-RHO = 1
 
 
 def main():
@@ -72,9 +73,9 @@ def main():
             success_rate = success_sub_sum / CV_NO_SPLITS
 
         else:
-            test_samples, test_labels = get_data(subject, False, DATA_PATH)
             # load Eval data
             model.fit(samples, labels)
+            test_samples, test_labels = get_data(subject, False, DATA_PATH)
             success_rate = model.score(test_samples, test_labels)
 
         print(f"Subject {subject}: {success_rate}")
@@ -121,17 +122,84 @@ def main_export(subject, sample_idx, foldername):
     with open(os.path.join(foldername, "input.pkl"), "wb") as _f:
         pickle.dump(history["input"], _f)
 
+def main_dataset_export(subject=-1, foldername='./export'):
+    """Exports the full dataset (training and test data) passed through 
+    the (quantized) Riemannian model for feature extraction for 
+    separate exploration of classifiers. """
+
+    if QUANTIZED:
+        model = QuantizedRiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
+    else:
+        model = RiemannianModel(bands=BANDS, random_state=RANDOM_SEED, riem_opt=RIEM_OPT, rho=RHO)
+
+
+
+    if subject == -1:
+        subjects = [i+1 for i in range(NO_SUBJECTS)]
+    else:
+        subjects = [subject]
+
+
+    dataset = {'patient': subjects, 'dataset_train': list(), 'dataset_test': list()}
+    for patient in subjects:
+
+        print(f'export patient: {patient}')
+
+        train_samples, train_labels = get_data(patient, True, DATA_PATH)
+        test_samples, test_labels = get_data(patient, False, DATA_PATH)
+
+        # fit the data
+        model.fit(train_samples, train_labels)
+        
+        success_rate = model.score(test_samples, test_labels)
+        print(f"ACCURACY: {success_rate}")
+
+        # predict the requested sample
+        def gen_patient_dataset(samples, labels):
+            dataset_patient_test = {'features_quant': list(), 'label': list()}
+                
+            dataset_patient_test['features_quant'] = model.riemannian.features(samples)
+            dataset_patient_test['label'] = labels
+
+            # for sample_idx, (sample, label) in tqdm(
+            #     enumerate(zip(samples, labels)), 
+            #     desc="forward pass samples", total=len(samples), leave=False):
+
+            #     # gather all data
+            #     history = model.predict_with_intermediate(sample, verbose=False)
+            #     dataset_patient_test['features_quant'].append(history["features_quant"])
+            #     # dataset_patient_test['features_quant'].append(history["features"])
+            #     dataset_patient_test['label'].append(label)
+            return dataset_patient_test
+
+        dataset_patient_train = gen_patient_dataset(train_samples, train_labels)
+        dataset['dataset_train'].append(dataset_patient_train)
+        dataset_patient_test = gen_patient_dataset(test_samples, test_labels)
+        dataset['dataset_test'].append(dataset_patient_test)
+
+        model.classifier.fit(dataset_patient_train['features_quant'], dataset_patient_train['label'])
+        success_rate2 = model.classifier.score(dataset_patient_test['features_quant'], dataset_patient_test['label'])
+        print(f"ACCURACY2: {success_rate2}")
+
+    # save full dataset
+    os.makedirs(foldername, exist_ok=True)
+    with open(os.path.join(foldername, "dataset_full.pkl"), "wb") as _f:
+        pickle.dump(dataset, _f)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--export", action="store_true", help="Export the model and data")
-    parser.add_argument("-s", "--subject", type=int, default=1, help="Subject to store")
+    parser.add_argument("-d", "--dataset-export", action="store_true", help="Export full dataset with extracted features")
+    parser.add_argument("-s", "--subject", type=int, default=1, help="Subject to store; specify -1 for all for dataset export")
     parser.add_argument("-i", "--sample_idx", type=int, default=0, help="Sample idx to store")
     parser.add_argument("-f", "--folder", type=str, default="export", help="Foldername to export")
 
     args = parser.parse_args()
 
-    if (args.export):
+    if args.export:
         main_export(args.subject, args.sample_idx, args.folder)
+    elif args.dataset_export:
+        main_dataset_export(args.subject, args.folder)
     else:
         main()

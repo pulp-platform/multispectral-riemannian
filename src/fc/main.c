@@ -32,13 +32,19 @@
 int main(void)
 {
 
-    // change the clock frequency
+  // change the clock frequency
 
-    // 100MHz
-    int freq = 100000000;
+  //*(uint32_t *)0x1A100014=0xd0885f5e;		//200 MHz on FC
+  //*(uint32_t *)0x1A100024=0xd088bebc;		//400 MHz on CL
 
-    rt_freq_set(RT_FREQ_DOMAIN_FC, freq);
-    rt_freq_set(RT_FREQ_DOMAIN_CL, freq);
+  // 100MHz
+  int freq = 160000000;
+
+  rt_freq_set(RT_FREQ_DOMAIN_FC, 60000000);
+  rt_freq_set(RT_FREQ_DOMAIN_CL, freq);
+
+  // change the voltage
+  //rt_voltage_force(RT_VOLTAGE_DOMAIN_MEMORY,600,NULL);
 
 #ifdef POWER
 

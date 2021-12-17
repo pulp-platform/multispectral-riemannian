@@ -25,7 +25,9 @@
 #include "math.h"
 #include "../../../../src/cl/insn.h"
 
-#define NUM_WORKERS 8
+#ifndef NUM_WORKERS
+#define NUM_WORKERS 9
+#endif//NUM_WORKERS
 
 RT_CL_DATA static float* a_stm_l1;
 RT_CL_DATA static float* d_stm_l1;
